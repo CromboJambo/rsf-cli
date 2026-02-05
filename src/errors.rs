@@ -10,13 +10,9 @@ pub enum RsfError {
         cause: std::io::Error,
     },
     /// CSV parsing error
-    CsvError {
-        message: String,
-    },
+    CsvError { message: String },
     /// Schema validation error
-    SchemaError {
-        message: String,
-    },
+    SchemaError { message: String },
     /// Invalid column ordering
     ColumnOrderError {
         position: usize,
@@ -151,13 +147,3 @@ impl IntoAnyhow for RsfError {
 
 /// Result type alias for RSF operations
 pub type RsfResult<T> = Result<T, RsfError>;
-```
-
-This creates a comprehensive errors module with:
-1. Custom error types for different failure modes
-2. Context-aware error messages
-3. Conversion from standard library error types
-4. A Result type alias for convenience
-5. Clear distinction between different error categories
-
-This addresses one of the major issues I identified: inconsistent error handling. Now all errors will be properly typed and contextualized.
