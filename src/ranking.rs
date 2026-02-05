@@ -17,8 +17,8 @@ pub struct ColumnMeta {
     pub name: String,
     pub rank: usize,
     pub cardinality: usize,
-    #[serde(rename = "type")]
-    pub col_type: ColumnType,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub col_type: Option<ColumnType>,
 }
 
 /// Schema representation
@@ -95,7 +95,7 @@ pub fn rank_columns(
                 name: name.clone(),
                 rank: idx,
                 cardinality: 0,
-                col_type: ColumnType::Key,
+                col_type: None,
             })
             .collect());
     }
@@ -111,7 +111,7 @@ pub fn rank_columns(
             name: stat.name,
             rank: idx,
             cardinality: stat.cardinality,
-            col_type: ColumnType::Key,
+            col_type: None,
         })
         .collect();
 
@@ -250,15 +250,16 @@ pub fn validate_column_order(headers: &[String], schema_columns: &[ColumnMeta]) 
         return Ok(());
     }
 
+    if headers.len() != schema_columns.len() {
+        return Err(RsfError::schema_error(format!(
+            "Schema column count ({}) does not match CSV column count ({})",
+            schema_columns.len(),
+            headers.len()
+        )));
+    }
+
     // Validate column order matches schema
     for (idx, col_meta) in schema_columns.iter().enumerate() {
-        if idx >= headers.len() {
-            return Err(RsfError::schema_error(format!(
-                "Schema has more columns than CSV (position {})",
-                idx
-            )));
-        }
-
         if headers[idx] != col_meta.name {
             return Err(RsfError::column_order_error(
                 idx,
@@ -284,25 +285,42 @@ pub fn validate_cardinality_order(
 
     // Compute actual cardinality
     let stats = compute_cardinality(headers, rows, options)?;
+    let mut cardinalities = HashMap::with_capacity(stats.len());
+    for stat in stats.iter() {
+        cardinalities.insert(stat.name.clone(), stat.cardinality);
+    }
+
+    for col_meta in schema_columns.iter() {
+        let actual = cardinalities.get(&col_meta.name).ok_or_else(|| {
+            RsfError::schema_error(format!("Column '{}' not found in data", col_meta.name))
+        })?;
+
+        if *actual != col_meta.cardinality {
+            return Err(RsfError::schema_error(format!(
+                "Column '{}' cardinality mismatch: schema {}, actual {}",
+                col_meta.name, col_meta.cardinality, actual
+            )));
+        }
+    }
 
     // Validate that columns are ordered by descending cardinality
     for window in schema_columns.windows(2) {
         let curr = &window[0];
         let next = &window[1];
 
-        let curr_actual = stats.iter().find(|s| s.name == curr.name).ok_or_else(|| {
+        let curr_actual = cardinalities.get(&curr.name).ok_or_else(|| {
             RsfError::schema_error(format!("Column '{}' not found in data", curr.name))
         })?;
 
-        let next_actual = stats.iter().find(|s| s.name == next.name).ok_or_else(|| {
+        let next_actual = cardinalities.get(&next.name).ok_or_else(|| {
             RsfError::schema_error(format!("Column '{}' not found in data", next.name))
         })?;
 
-        if curr_actual.cardinality < next_actual.cardinality {
+        if curr_actual < next_actual {
             return Err(RsfError::cardinality_error(
                 curr.name.clone(),
-                next_actual.cardinality,
-                curr_actual.cardinality,
+                *next_actual,
+                *curr_actual,
             ));
         }
     }
@@ -374,13 +392,13 @@ mod tests {
                 name: "B".to_string(),
                 rank: 1,
                 cardinality: 2,
-                col_type: ColumnType::Key,
+                col_type: None,
             },
             ColumnMeta {
                 name: "A".to_string(),
                 rank: 2,
                 cardinality: 2,
-                col_type: ColumnType::Key,
+                col_type: None,
             },
         ];
 

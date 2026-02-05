@@ -1,4 +1,4 @@
-use anyhow::{Context, Error};
+use anyhow::Error;
 use std::path::PathBuf;
 
 /// Custom error type for RSF operations
@@ -116,6 +116,15 @@ impl std::fmt::Display for RsfError {
     }
 }
 
+impl std::error::Error for RsfError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            RsfError::IoError { cause, .. } => Some(cause),
+            _ => None,
+        }
+    }
+}
+
 impl From<std::io::Error> for RsfError {
     fn from(err: std::io::Error) -> Self {
         RsfError::io_error(PathBuf::from("<unknown>"), err)
@@ -141,7 +150,7 @@ pub trait IntoAnyhow {
 
 impl IntoAnyhow for RsfError {
     fn into_anyhow(self) -> Error {
-        self.context("RSF operation failed")
+        Error::new(self).context("RSF operation failed")
     }
 }
 

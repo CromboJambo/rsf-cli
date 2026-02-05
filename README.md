@@ -107,20 +107,18 @@ columns:
   - name: TransactionID
     rank: 1
     cardinality: 10000
-    type: key
   - name: AccountID
     rank: 2
     cardinality: 2000
-    type: key
   - name: Vendor
     rank: 3
     cardinality: 300
-    type: key
   - name: Amount
     rank: 4
     cardinality: 8500
-    type: value
 ```
+
+`type` is optional and omitted by default.
 
 ## Integration with mirror-log
 
