@@ -1,0 +1,21 @@
+[package]
+name = "rsf-cli"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Ranked Spreadsheet Format - Deterministic column ordering based on cardinality"
+authors = ["Dustin Grover <dustinjgrover@gmail.com>"]
+keywords = ["csv", "spreadsheet", "data", "ranking", "cardinality"]
+categories = ["command-line-utilities", "data-structures"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+csv = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+anyhow = "1.0"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true

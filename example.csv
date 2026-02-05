@@ -1,0 +1,11 @@
+TransactionID,Amount,Category,Vendor,Month,AccountID
+TXN001,45.99,Food,Safeway,January,ACC2000
+TXN002,12.50,Transport,Uber,January,ACC2001
+TXN003,89.00,Food,Whole Foods,January,ACC2000
+TXN004,25.00,Transport,Lyft,February,ACC2001
+TXN005,150.00,Entertainment,Netflix,February,ACC2000
+TXN006,45.99,Food,Safeway,February,ACC2000
+TXN007,8.50,Food,Coffee Shop,March,ACC2001
+TXN008,200.00,Shopping,Amazon,March,ACC2000
+TXN009,12.50,Transport,Uber,March,ACC2001
+TXN010,45.99,Food,Safeway,March,ACC2000
