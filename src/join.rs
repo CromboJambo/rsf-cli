@@ -166,9 +166,9 @@ fn score_candidate(
         let ratio = if max_card == 0.0 { 1.0 } else { min_card / max_card };
         score += ratio * 0.2;
     }
-
     // Unique columns are better join keys (score up to 0.1).
-    let uniqueness_bonus = (prof1.unique_pct.unwrap_or(0.0) + prof2.unique_pct.unwrap_or(0.0)) / 200.0;
+    let uniqueness_bonus =
+        (prof1.unique_pct() + prof2.unique_pct()) / 200.0;
     score += uniqueness_bonus.min(0.1);
 
     score.min(1.0)

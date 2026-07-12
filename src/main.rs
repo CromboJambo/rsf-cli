@@ -15,7 +15,7 @@ use crate::errors::IntoAnyhow;
 use crate::deps::{find_functional_dependencies, print_report as print_fd_report, FdConfig};
 use crate::join::{execute_join, find_join_candidates, print_join_report, print_plan_report, JoinConfig, JoinMode};
 use crate::ranking::{
-    rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
+    compute_profiles, rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
     validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
 };
 /// RSF - Ranked Spreadsheet Format
@@ -234,13 +234,13 @@ fn main() -> Result<()> {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
-            let profiles = rank_columns(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let profiles = compute_profiles(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
 
             let config = FdConfig {
                 treat_empty_as_null,
             };
 
-            let deps = find_functional_dependencies(&headers, &rows, &profiles, &config).map_err(IntoAnyhow::into_anyhow)?;
+            let deps = find_functional_dependencies(&headers, &rows, &profiles, &config);
             print_fd_report(&deps);
         }
 
