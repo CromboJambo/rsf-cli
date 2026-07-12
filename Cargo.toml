@@ -15,6 +15,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 anyhow = "1.0"
 encoding_rs_io = "0.1.7"
+regex = "1.10"
 
 [profile.release]
 strip = true

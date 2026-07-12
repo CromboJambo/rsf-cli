@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 use crate::errors::IntoAnyhow;
 use crate::ranking::{
     rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
-    validate_column_order, validate_sorted, write_schema, RankingOptions, Schema,
+    validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
 };
-
 /// RSF - Ranked Spreadsheet Format
 ///
 /// Deterministic column ordering based on cardinality.
@@ -127,16 +126,46 @@ fn main() -> Result<()> {
 
         Commands::Stats { input } => {
             let (headers, rows) = read_csv_file(&input)?;
-            let options = ranking_options(true);
+            // For profiling, treat empty strings as nulls so we can report null%
+            let options = RankingOptions {
+                treat_empty_as_null: true,
+                include_nulls: false,
+            };
             let stats = rank_columns(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
 
             println!("\n=== Column Statistics ===\n");
-            println!("{:<20} {:>12}", "Column", "Cardinality");
-            println!("{}", "-".repeat(34));
+            println!(
+                "{:<20} {:>10} {:>8} {:>8}  {}",
+                "Column", "Cardinality", "Null%", "Unique%", "Type"
+            );
+            println!("{}", "-".repeat(60));
 
-            for stat in stats {
-                println!("{:<20} {:>12}", stat.name, stat.cardinality);
+            for stat in &stats {
+                let null_pct = stat.null_pct.map(|p| format!("{:.1}", p)).unwrap_or_else(|| "-".to_string());
+                let unique_pct = stat.unique_pct.map(|p| format!("{:.1}", p)).unwrap_or_else(|| "-".to_string());
+                let type_hint = match &stat.type_hint {
+                    Some(TypeHint::Unknown) => "text",
+                    Some(th) => {
+                        let s = format!("{:?}", th);
+                        // Strip the TypeHint:: prefix and quotes for display
+                        if s.contains("Id(") {
+                            &s.replace("TypeHint::", "").replace("\"", "")
+                        } else {
+                            &s.replace("TypeHint::", "")
+                        }
+                    },
+                    None => "text",
+                };
+
+                let const_marker = if stat.is_constant == Some(true) { "*" } else { "" };
+
+                println!(
+                    "{:<20} {:>10} {:>8} {:>8}  {}{}",
+                    stat.name, stat.cardinality, null_pct, unique_pct, type_hint, const_marker
+                );
             }
+
+            println!("\n* = constant column (all non-null values are the same)");
         }
     }
 
