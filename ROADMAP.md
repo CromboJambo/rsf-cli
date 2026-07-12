@@ -8,7 +8,7 @@
 | 1     | Rich column profiling      | ✅ Done    |
 | 2     | Type inference             | ✅ Done    |
 | 3     | Duplicate detection        | ✅ Done    |
-| 4     | Functional dependencies    | ⬜ Planned |
+| 4     | Functional dependencies    | ✅ Done    |
 | 5     | Multi-file join planning   | ⬜ Planned |
 
 ---
@@ -95,23 +95,39 @@ Month                           12      0.0      100.0  date
 
 ---
 
-## Phase 4 — Functional Dependency Detection (Planned)
+## Phase 4 — Functional Dependency Detection (Done)
 
 **Goal:** Discover hidden relational structure in ERP data automatically. If you know Column A's value, do you always know Column B's too?
 
-**Planned features:**
-- New subcommand: `rsf deps` (or fold into an enhanced `rsf stats`)
-- For each pair of columns, check if one functionally determines the other
-- Report format: `"Column A → Column B"` means every value of A maps to exactly one value of B
-- Reveals patterns like: "Vendor always ships from the same warehouse" or "Category is always paired with a specific AccountID"
+**What's built:**
+- `rsf deps` subcommand — analyzes an RSF file for functional dependencies and candidate keys
+- For each column pair (A → B), checks if every value of A maps to exactly one value of B
+- Reports: `"Column A → Column B"` with cardinality info, grouped by determinant
+- Candidate key detection: columns that functionally determine ALL other columns (marked with ★)
+- `FdConfig` with `treat_empty_as_null` option for consistent null handling
+- Output to stderr; groups multiple FDs from the same determinant into `{B, C, D}` notation
 
-**Implementation approach:**
-1. For each column pair (A, B), build a map from A's values → set of B's values
-2. If any A-value maps to multiple distinct B-values, no functional dependency exists
-3. Report all dependencies found, sorted by strength (fewer violations = stronger)
-4. Optionally report candidate keys: columns that functionally determine all others
+**Implementation:**
+- Module: `src/deps.rs` — 387 lines, 8 unit tests
+- `find_functional_dependencies(headers, rows, profiles, config)` → `FdResult { fds, candidate_keys, pairs_analyzed }`
+- O(n²) column-pair analysis with HashMap-based value mapping per pair
+- FDs sorted by determinant cardinality descending (stronger determinants first), then alphabetically
 
-**Why this matters:** This is where rsf-cli starts doing something Excel literally cannot — discovering the relational structure of your data automatically, without knowing the schema ahead of time.
+**Example output:**
+```
+=== Functional Dependency Analysis ===
+Column pairs analyzed: 12
+Functional dependencies found: 5
+Candidate keys: TransactionID (card=10000)
+
+--- Dependencies ---
+  Vendor → {Category, Account}  [card=300]
+  Category → Account  [card=20→8]
+  Month → Quarter  [card=12→4]
+
+--- Candidate Keys ---
+  ★ TransactionID (cardinality: 10000) — determines all other columns
+```
 
 ---
 
