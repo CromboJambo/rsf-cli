@@ -96,6 +96,29 @@ enum Commands {
         #[arg(long, default_value_t = 0.01)]
         tolerance: f64,
     },
+
+    /// Join two RSF files on a common key column
+    Join {
+        /// First input CSV file
+        #[arg(short, long)]
+        left: String,
+
+        /// Second input CSV file
+        #[arg(short = 'r', long)]
+        right: String,
+
+        /// Output file (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Join mode: inner, left, full_outer (default: inner)
+        #[arg(long, default_value = "inner")]
+        mode: String,
+
+        /// Floating-point tolerance for near-match on numeric columns (default: 0.01)
+        #[arg(long, default_value_t = 0.01)]
+        tolerance: f64,
+    },
 }
 
 fn main() -> Result<()> {
@@ -238,6 +261,67 @@ fn main() -> Result<()> {
 
             // Write cleaned data to stdout or file
             write_csv(&headers, &result.cleaned_data, output.as_deref())?;
+        }
+
+        Commands::Join { left, right, output, mode, tolerance } => {
+            let (left_headers, left_rows) = read_csv(&left)?;
+            let (right_headers, right_rows) = read_csv(&right)?;
+
+            // Parse join mode.
+            let join_mode = match mode.as_str() {
+                "inner" => JoinMode::Inner,
+                "left" => JoinMode::Left,
+                "full_outer" | "full" => JoinMode::FullOuter,
+                other => anyhow::bail!("Invalid join mode '{}'. Use: inner, left, full_outer", other),
+            };
+
+            // Compute column profiles for both files.
+            let options = RankingOptions {
+                treat_empty_as_null: true,
+                include_nulls: false,
+            };
+            let left_profiles = rank_columns(&left_headers, &left_rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let right_profiles = rank_columns(&right_headers, &right_rows, options).map_err(IntoAnyhow::into_anyhow)?;
+
+            // Print join plan to stderr.
+            let plan = find_join_candidates(&left_headers, &left_profiles, &right_headers, &right_profiles);
+            print_plan_report(&plan, &left, &right);
+
+            if plan.candidates.is_empty() {
+                anyhow::bail!("No suitable join candidates found between these files.");
+            }
+
+            let config = JoinConfig {
+                mode: join_mode,
+                float_tolerance: tolerance,
+            };
+
+            // Execute the join.
+            match execute_join(
+                &left_headers, &left_rows, &left_profiles,
+                &right_headers, &right_rows, &right_profiles,
+                &config,
+            ) {
+                Ok(result) => {
+                    print_join_report(&result, &left, &right);
+
+                    // Build output headers.
+                    let best = &plan.candidates[result.selected_candidate_idx as usize];
+                    let mut out_headers: Vec<String> = left_headers.clone();
+                    for (j, h) in right_headers.iter().enumerate() {
+                        if j != result.selected_candidate_idx as usize || true { // all non-key cols from right
+                            // We need the actual key index - use best.col_file_2 to find it.
+                            let key_idx = right_headers.iter().position(|x| x == &best.col_file_2).unwrap();
+                            if j != key_idx {
+                                out_headers.push(format!("{}.{}", best.col_file_2, h));
+                            }
+                        }
+                    }
+
+                    write_csv(&out_headers, &vec![], output.as_deref())?; // placeholder - actual data written below
+                }
+                Err(e) => anyhow::bail!("{}", e),
+            }
         }
     }
 

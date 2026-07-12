@@ -57,7 +57,6 @@ pub struct JoinPlanResult {
 }
 
 /// Result of an executed join.
-#[derive(Debug)]
 pub struct JoinResult {
     /// The plan that was used (or None if auto-selected).
     pub plan: Option<JoinPlanResult>,
@@ -73,6 +72,10 @@ pub struct JoinResult {
     pub left_unmatched: usize,
     /// Mismatched / unmatched rows from file 2 (right-only in full outer).
     pub right_unmatched: usize,
+    /// Output headers.
+    pub output_headers: Vec<String>,
+    /// Output data rows.
+    pub output_rows_data: Vec<Vec<String>>,
 }
 
 /// Compute column profiles for a dataset.
@@ -324,6 +327,8 @@ pub fn execute_join(
                 output_rows: output_rows.len(),
                 left_unmatched,
                 right_unmatched,
+                output_headers: out_headers,
+                output_rows_data: output_rows,
             })
         }
 
