@@ -214,7 +214,7 @@ pub fn rank_columns(
 }
 
 /// Compute rich profiles for each column
-fn compute_profiles(
+pub(crate) fn compute_profiles(
     headers: &[String],
     rows: &[Vec<String>],
     options: RankingOptions,
