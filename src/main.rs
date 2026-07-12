@@ -1,4 +1,5 @@
 mod dedup;
+mod deps;
 mod errors;
 mod ranking;
 
@@ -10,6 +11,7 @@ use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::errors::IntoAnyhow;
+use crate::deps::{find_functional_dependencies, print_report as print_fd_report, FdConfig};
 use crate::ranking::{
     rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
     validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
@@ -61,6 +63,17 @@ enum Commands {
     Stats {
         /// Input CSV file
         input: PathBuf,
+    },
+
+    /// Detect functional dependencies in a CSV file
+    Deps {
+        /// Input CSV file (use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+
+        /// Treat empty strings as null values
+        #[arg(long)]
+        treat_empty_as_null: bool,
     },
 
     /// Detect and remove duplicate rows
@@ -186,6 +199,24 @@ fn main() -> Result<()> {
             }
 
             println!("\n* = constant column (all non-null values are the same)");
+        }
+
+        Commands::Deps { input, treat_empty_as_null } => {
+            let (headers, rows) = read_csv(&input)?;
+
+            // Compute column profiles for FD analysis.
+            let options = RankingOptions {
+                treat_empty_as_null: true,
+                include_nulls: false,
+            };
+            let profiles = rank_columns(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
+
+            let config = FdConfig {
+                treat_empty_as_null,
+            };
+
+            let deps = find_functional_dependencies(&headers, &rows, &profiles, &config).map_err(IntoAnyhow::into_anyhow)?;
+            print_fd_report(&deps);
         }
 
         Commands::Dedup { input, output, keys, tolerance } => {

@@ -202,7 +202,7 @@ pub fn print_report(result: &FdResult) {
                 );
             } else {
                 // Multiple FDs from same determinant — group them.
-                let dep_names: Vec<&str> = deps.iter().map(|fd| &fd.dependent).collect();
+                let dep_names: Vec<&str> = deps.iter().map(|fd| fd.dependent.as_str()).collect();
                 let card = deps[0].determinant_cardinality;
                 eprintln!(
                     "  {} → {{{}}}  [card={}]",
