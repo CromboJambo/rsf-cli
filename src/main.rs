@@ -1,3 +1,4 @@
+mod dedup;
 mod errors;
 mod ranking;
 
@@ -60,6 +61,25 @@ enum Commands {
     Stats {
         /// Input CSV file
         input: PathBuf,
+    },
+
+    /// Detect and remove duplicate rows
+    Dedup {
+        /// Input CSV file (use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+
+        /// Output file (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Number of top key columns to group by (default: 3)
+        #[arg(long, default_value_t = 3)]
+        keys: usize,
+
+        /// Floating-point tolerance for near-duplicate matching (default: 0.01)
+        #[arg(long, default_value_t = 0.01)]
+        tolerance: f64,
     },
 }
 
@@ -166,6 +186,25 @@ fn main() -> Result<()> {
             }
 
             println!("\n* = constant column (all non-null values are the same)");
+        }
+
+        Commands::Dedup { input, output, keys, tolerance } => {
+            let (headers, rows) = read_csv(&input)?;
+
+            let config = dedup::DedupConfig {
+                key_columns: keys,
+                float_tolerance: tolerance,
+                trim_whitespace: true,
+            };
+
+            let result = dedup::find_duplicates(&headers, &rows, &config).map_err(IntoAnyhow::into_anyhow)?;
+
+            // Print report to stderr
+            let key_indices = dedup::determine_key_columns_for_report(&headers, &rows, keys);
+            dedup::print_report(&result, &headers, &key_indices);
+
+            // Write cleaned data to stdout or file
+            write_csv(&headers, &result.cleaned_data, output.as_deref())?;
         }
     }
 
