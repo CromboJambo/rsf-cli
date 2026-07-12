@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::IntoAnyhow;
 use crate::deps::{find_functional_dependencies, print_report as print_fd_report, FdConfig};
+use crate::join::{execute_join, find_join_candidates, print_join_report, print_plan_report, JoinConfig, JoinMode};
 use crate::ranking::{
     rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
     validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
