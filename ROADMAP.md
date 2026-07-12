@@ -7,7 +7,7 @@
 | 0     | Core ranking & sorting     | ✅ Done    |
 | 1     | Rich column profiling      | ✅ Done    |
 | 2     | Type inference             | ✅ Done    |
-| 3     | Duplicate detection        | ⬜ Planned |
+| 3     | Duplicate detection        | ✅ Done    |
 | 4     | Functional dependencies    | ⬜ Planned |
 | 5     | Multi-file join planning   | ⬜ Planned |
 
