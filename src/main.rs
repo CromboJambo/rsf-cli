@@ -1,6 +1,7 @@
 mod dedup;
 mod deps;
 mod errors;
+mod join;
 mod ranking;
 
 use anyhow::{Context, Result};
