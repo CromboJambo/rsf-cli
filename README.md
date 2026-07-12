@@ -87,6 +87,60 @@ Category                      20
 Month                         12
 ```
 
+### Find duplicates
+
+```bash
+# Detect near-duplicate rows using top-N cardinality columns as keys
+rsf dedup input.csv -o duplicates.json
+
+# Customize key columns and float tolerance
+rsf dedup input.csv --keys TransactionID,Vendor,Category \
+                    --tolerance 0.05
+```
+
+Output (`duplicates.json`):
+```json
+{
+  "total_rows": 10000,
+  "exact_groups": 3,
+  "near_duplicate_groups": 7,
+  "rows_removed": 42,
+  "duplicate_groups": [
+    {
+      "key_values": ["TXN001", "Safeway", "Food"],
+      "row_indices": [0, 5],
+      "differences": [
+        {"type": "CurrencyFormat", "col": "Amount", "values": ["$45.99", "45.99"]}
+      ]
+    }
+  ],
+  "cleaned_data": [...]
+}
+```
+
+### Analyze functional dependencies
+
+```bash
+# Discover which columns functionally determine others
+rsf deps input.rsf
+```
+
+Output:
+```
+=== Functional Dependency Analysis ===
+Column pairs analyzed: 12
+Functional dependencies found: 5
+Candidate keys: TransactionID (card=10000)
+
+--- Dependencies ---
+  Vendor → {Category, Account}  [card=300]
+  Category → Account  [card=20→8]
+  Month → Quarter  [card=12→4]
+
+--- Candidate Keys ---
+  ★ TransactionID (cardinality: 10000) — determines all other columns
+```
+
 ### Validate RSF file
 
 ```bash
@@ -142,6 +196,8 @@ Once columns are ranked correctly:
 - **Safe sorting** - Can't accidentally destroy relationships
 - **Lossless reshaping** - Structure is preserved
 - **Deterministic joins** - Keys are explicit
+- **Duplicate detection** - `rsf dedup` finds exact and near-duplicate rows with difference reporting
+- **Functional dependency discovery** - `rsf deps` reveals hidden relational structure (candidate keys, value constraints)
 - **Zero "did I break the data?" anxiety**
 
 ## Examples
