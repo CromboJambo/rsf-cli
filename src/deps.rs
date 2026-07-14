@@ -298,9 +298,13 @@ mod tests {
             vec!["TXN002".to_string(), "Uber".to_string(), "15.00".to_string()],
             vec!["TXN003".to_string(), "Safeway".to_string(), "25.00".to_string()], // repeated Vendor
 <<<<<<< HEAD
+<<<<<<< HEAD
             vec!["TXN004".to_string(), "Uber".to_string(), "10.00".to_string()], // repeated Amount, Vendor
 =======
 >>>>>>> 15a23aa (Refine FD tests and simplify join boundary checks)
+=======
+            vec!["TXN004".to_string(), "Uber".to_string(), "10.00".to_string()], // repeated Amount, Vendor
+>>>>>>> b7e54f3 (Improve FD test case to handle non-unique data)
         ];
 
         let profiles = make_profiles(&headers, &rows);
