@@ -297,6 +297,7 @@ mod tests {
             vec!["TXN001".to_string(), "Safeway".to_string(), "10.00".to_string()],
             vec!["TXN002".to_string(), "Uber".to_string(), "15.00".to_string()],
             vec!["TXN003".to_string(), "Safeway".to_string(), "25.00".to_string()], // repeated Vendor
+            vec!["TXN004".to_string(), "Uber".to_string(), "10.00".to_string()], // repeated Amount, Vendor
         ];
 
         let profiles = make_profiles(&headers, &rows);
@@ -344,7 +345,8 @@ mod tests {
 
     #[test]
     fn test_grouped_output() {
-        // Multiple FDs from same determinant should be grouped in output.
+        // Key → A, B, C should all be detected.
+        // Add more rows so A, B, C have repeated values (not unique).
         let headers = vec![
             "Key".to_string(),
             "A".to_string(),
@@ -354,15 +356,25 @@ mod tests {
         let rows = vec![
             vec!["K1".to_string(), "x".to_string(), "p".to_string(), "m".to_string()],
             vec!["K2".to_string(), "y".to_string(), "q".to_string(), "n".to_string()],
+            vec!["K3".to_string(), "x".to_string(), "p".to_string(), "m".to_string()], // repeated A, B, C values
         ];
 
         let profiles = make_profiles(&headers, &rows);
         let result = find_functional_dependencies(&headers, &rows, &profiles, &FdConfig::default());
 
         // Key → A, B, C should all be detected.
-        assert!(result.fds.iter().any(|fd| fd.determinant == "Key" && fd.dependent == "A"));
-        assert!(result.fds.iter().any(|fd| fd.determinant == "Key" && fd.dependent == "B"));
-        assert!(result.fds.iter().any(|fd| fd.determinant == "Key" && fd.dependent == "C"));
+        assert!(result
+            .fds
+            .iter()
+            .any(|fd| fd.determinant == "Key" && fd.dependent == "A"));
+        assert!(result
+            .fds
+            .iter()
+            .any(|fd| fd.determinant == "Key" && fd.dependent == "B"));
+        assert!(result
+            .fds
+            .iter()
+            .any(|fd| fd.determinant == "Key" && fd.dependent == "C"));
 
         // Key should be a candidate key (determines all 3 others).
         assert_eq!(result.candidate_keys.len(), 1);
