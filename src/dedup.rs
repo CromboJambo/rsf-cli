@@ -1,5 +1,7 @@
 use crate::errors::RsfResult;
-use crate::ranking::{compute_profiles, RankingOptions};
+
+/* Note: compute_profiles and RankingOptions were used during development but removed.
+   The dedup logic works without them - it just uses raw row data. */
 use std::collections::HashMap;
 
 /// Configuration for duplicate detection behavior.
