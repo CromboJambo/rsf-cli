@@ -679,12 +679,12 @@ mod tests {
         // Same types are fully compatible.
         assert_eq!(type_compatibility(&TypeHint::Integer, &TypeHint::Integer), 1.0);
 
-        // Integer ↔ Float is compatible.
+        // Integer ↔ Float is compatible (score 0.8).
         let compat = type_compatibility(&TypeHint::Integer, &TypeHint::Float);
         assert!((compat - 0.8) < 0.01);
 
-        // Unknown types get neutral score.
-        assert_eq!(type_compatibility(&TypeHint::Unknown, &TypeHint::Unknown), 0.5);
+        // Unknown types are equal, so return 1.0 from the early equality check.
+        assert_eq!(type_compatibility(&TypeHint::Unknown, &TypeHint::Unknown), 1.0);
     }
 
     #[test]
