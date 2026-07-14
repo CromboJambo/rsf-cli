@@ -160,23 +160,15 @@ pub fn find_duplicates(
 }
 
 /// Determine which columns to use as keys for deduplication.
-/// Picks the N highest-cardinality columns, since identifiers tend to have high cardinality.
+/// By default, uses the first `n` columns (positional).
 pub fn determine_key_columns_for_report(
     headers: &[String],
     rows: &[Vec<String>],
     n: usize,
 ) -> Vec<usize> {
-    let options = RankingOptions::default();
-    let profiles = compute_profiles(headers, rows, options).unwrap_or_default();
-
-    // Sort by cardinality descending (highest first), take top N.
-    let mut indexed: Vec<(usize, &crate::ranking::ColumnProfile)> =
-        profiles.iter().enumerate().collect();
-    indexed.sort_by(|a, b| {
-        b.1.cardinality.cmp(&a.1.cardinality).then(a.0.cmp(&b.0)) // tiebreak by original position
-    });
-
-    indexed.into_iter().take(n).map(|(i, _)| i).collect()
+    let num_key_cols = n.min(headers.len());
+    // Use positional columns 0..n as the key.
+    (0..num_key_cols).collect()
 }
 
 /// Group rows by their key column values into a single string key.
