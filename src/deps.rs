@@ -287,6 +287,7 @@ mod tests {
     #[test]
     fn test_candidate_key() {
         // TransactionID has unique values → determines everything.
+        // Other columns have repeated values so they don't determine all others.
         let headers = vec![
             "TransactionID".to_string(),
             "Vendor".to_string(),
@@ -295,12 +296,13 @@ mod tests {
         let rows = vec![
             vec!["TXN001".to_string(), "Safeway".to_string(), "10.00".to_string()],
             vec!["TXN002".to_string(), "Uber".to_string(), "15.00".to_string()],
-            vec!["TXN003".to_string(), "Amazon".to_string(), "25.00".to_string()],
+            vec!["TXN003".to_string(), "Safeway".to_string(), "25.00".to_string()], // repeated Vendor
         ];
 
         let profiles = make_profiles(&headers, &rows);
         let result = find_functional_dependencies(&headers, &rows, &profiles, &FdConfig::default());
 
+        // Only TransactionID is a candidate key (determines all other columns).
         assert_eq!(result.candidate_keys.len(), 1);
         assert_eq!(result.candidate_keys[0].name, "TransactionID");
     }

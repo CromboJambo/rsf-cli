@@ -291,7 +291,7 @@ pub fn execute_join(
     match config.mode {
         JoinMode::Inner => {
             for (row_idx1, row1) in rows1.iter().enumerate() {
-                if row_idx1 >= idx1 || idx1 >= row1.len() {
+                if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
                 }
@@ -332,7 +332,7 @@ pub fn execute_join(
 
         JoinMode::Left => {
             for (row_idx1, row1) in rows1.iter().enumerate() {
-                if row_idx1 >= idx1 || idx1 >= row1.len() {
+                if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
                 }
@@ -383,7 +383,7 @@ pub fn execute_join(
             let mut right_unmatched = 0usize;
             // Process all file 1 rows.
             for (row_idx1, row1) in rows1.iter().enumerate() {
-                if row_idx1 >= idx1 || idx1 >= row1.len() {
+                if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
                 }
