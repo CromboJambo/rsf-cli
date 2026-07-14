@@ -91,7 +91,7 @@ pub fn find_duplicates(
     let key_indices = determine_key_columns_for_report(headers, rows, num_key_cols);
 
     // Group rows by their key column values.
-    let groups: HashMap<String, Vec<(usize, Vec<String>)>> = group_by_keys(rows, &key_indices);
+    let groups: HashMap<String, Vec<(usize, Vec<String>)>> = group_by_keys(rows, &key_indices, config);
 
     // Count multi-member groups and total rows in them before consuming `groups`.
     let multi_group_count = groups.iter().filter(|(_, m)| m.len() > 1).count();
@@ -175,6 +175,7 @@ pub fn determine_key_columns_for_report(
 fn group_by_keys(
     rows: &[Vec<String>],
     key_indices: &[usize],
+    config: &DedupConfig,
 ) -> HashMap<String, Vec<(usize, Vec<String>)>> {
     let mut groups: HashMap<String, Vec<(usize, Vec<String>)>> = HashMap::new();
 
@@ -183,9 +184,15 @@ fn group_by_keys(
             .iter()
             .filter_map(|&i| row.get(i).map(|v| v.as_str()))
             .collect();
-        let key = key_parts.join("\x1f"); // unit separator as delimiter
+        
+        // Apply trimming if configured.
+        let key_value: String = if config.trim_whitespace {
+            key_parts.iter().map(|s| s.trim()).collect::<Vec<_>>().join("\x1f")
+        } else {
+            key_parts.join("\x1f")
+        };
 
-        groups.entry(key).or_default().push((row_idx, row.clone()));
+        groups.entry(key_value).or_default().push((row_idx, row.clone()));
     }
 
     groups
@@ -513,7 +520,7 @@ mod tests {
         let headers = vec!["id".to_string(), "name".to_string(), "amount".to_string()];
         let rows = vec![
             vec!["1".to_string(), "Alice ".to_string(), "10.00".to_string()],
-            vec!["1".to_string(), "Alice".to_string(), "10.00".to_string()], // trailing space diff
+            vec!["1".to_string(), "Alice".to_string(), "10.00".to_string()], // trailing space diff in name (key column)
         ];
 
         let config = DedupConfig {
@@ -521,9 +528,12 @@ mod tests {
             trim_whitespace: true,
             ..Default::default()
         };
+        
+        // With positional columns as keys and trim_whitespace=true, 
+        // "Alice " should match "Alice" in the key column.
         let result = find_duplicates(&headers, &rows, &config).unwrap();
 
         assert_eq!(result.total_rows, 2);
-        assert_eq!(result.cleaned_data.len(), 1); // grouped together
+        assert_eq!(result.cleaned_data.len(), 1); // grouped together after trimming
     }
 }
