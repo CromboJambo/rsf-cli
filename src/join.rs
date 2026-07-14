@@ -677,14 +677,14 @@ mod tests {
         use crate::ranking::TypeHint;
 
         // Same types are fully compatible.
-        assert_eq!(type_compatibility(&Some(TypeHint::Integer), &Some(TypeHint::Integer)), 1.0);
+        assert_eq!(type_compatibility(&TypeHint::Integer, &TypeHint::Integer), 1.0);
 
         // Integer ↔ Float is compatible.
-        let compat = type_compatibility(&Some(TypeHint::Integer), &Some(TypeHint::Float));
+        let compat = type_compatibility(&TypeHint::Integer, &TypeHint::Float);
         assert!((compat - 0.8) < 0.01);
 
         // Unknown types get neutral score.
-        assert_eq!(type_compatibility(&None, &None), 0.5);
+        assert_eq!(type_compatibility(&TypeHint::Unknown, &TypeHint::Unknown), 0.5);
     }
 
     #[test]

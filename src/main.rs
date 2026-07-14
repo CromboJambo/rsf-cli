@@ -280,8 +280,8 @@ fn main() -> Result<()> {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
-            let left_profiles = rank_columns(&left_headers, &left_rows, options).map_err(IntoAnyhow::into_anyhow)?;
-            let right_profiles = rank_columns(&right_headers, &right_rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let left_profiles = compute_profiles(&left_headers, &left_rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let right_profiles = compute_profiles(&right_headers, &right_rows, options).map_err(IntoAnyhow::into_anyhow)?;
 
             // Print join plan to stderr.
             let plan = find_join_candidates(&left_headers, &left_profiles, &right_headers, &right_profiles);
