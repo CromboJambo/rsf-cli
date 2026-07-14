@@ -9,7 +9,7 @@
 | 2     | Type inference             | ✅ Done    |
 | 3     | Duplicate detection        | ✅ Done    |
 | 4     | Functional dependencies    | ✅ Done    |
-| 5     | Multi-file join planning   | ⬜ Planned |
+| 5     | Multi-file join planning   | ✅ Done    |
 
 ---
 
@@ -73,15 +73,14 @@ Month                           12      0.0      100.0  date
 
 ---
 
-## Phase 3 — Duplicate Detection (Planned)
+## Phase 3 — Duplicate Detection (Done)
 
 **Goal:** Find duplicates and near-duplicates in ERP exports where rounding differences, whitespace issues, or accidental re-exports create messy data.
 
-**Planned features:**
-- New subcommand: `rsf dedup`
-- Takes an RSF file (or raw CSV) and flags duplicate/near-duplicate rows
-- **Exact duplicates** — all columns match identically
-- **Near duplicates** — key columns match but value columns differ slightly (within configurable tolerance)
+**What's built:**
+- `rsf dedup` subcommand — takes a CSV file and flags duplicate/near-duplicate rows
+- Exact duplicates — all columns match identically  
+- Near duplicates — key columns match but value columns differ slightly (within configurable tolerance)
 - Output: list of duplicate groups with row numbers, plus a cleaned version
 
 **Implementation approach:**
@@ -131,35 +130,40 @@ Candidate keys: TransactionID (card=10000)
 
 ---
 
-## Phase 5 — Multi-File Join Planning (Planned)
+## Phase 5 — Multi-File Join Planning (Done)
 
 **Goal:** Given two CSVs from an ERP export, suggest which columns to join on based on cardinality overlap and functional dependencies discovered in Phase 4.
 
-**Planned features:**
-- New subcommand: `rsf join --plan file1.rsf file2.rsf`
-- Analyzes both files' schemas
-- Finds candidate join keys (columns with matching names or similar cardinalities)
-- Reports: `"These two files likely share a relationship on Column X"`
-- Optionally performs the join and outputs the result
+**What's built:**
+- `rsf join` subcommand — joins two CSV files on a common key column
+- Analyzes both files' schemas for candidate join keys (exact name match + compatible types)
+- Supports inner, left, and full outer join modes
+- Reports: `"These two files likely share a relationship on Column X"` with confidence scores
 
 **Implementation approach:**
-1. Load both RSF files and their schema metadata
+1. Load both CSVs and compute column profiles
 2. Compare column names, cardinalities, type hints across files
-3. Use functional dependencies from Phase 4 to confirm candidate keys
-4. Rank candidates by confidence (exact name match + matching types = high confidence)
-5. Support inner, left, and full outer join modes
+3. Rank candidates by confidence (exact name match + matching types = high confidence)
+4. Execute the join using the best candidate
+5. Output joined result with unmatched row counts
 
-**Why this matters:** This is where rsf-cli becomes a real data tool rather than just a single-file formatting utility — but it's less urgent than phases 3–4.
+**Example usage:**
+```bash
+rsf join --left file1.csv --right file2.csv --mode left -o joined.csv
+rsf join --plan file1.rsf file2.rsf  # just show candidates without joining
+```
+
+**Why this matters:** This is where rsf-cli becomes a real data tool rather than just a single-file formatting utility — you can now merge related datasets from different ERP exports.
 
 ---
 
 ## Summary
 
-| Phase | Feature                 | Effort      | Value for your work                             |
-|-------|-------------------------|-------------|-------------------------------------------------|
-| 0     | Core ranking & sorting  | Low         | High — the foundation everything builds on      |
-| 1     | Rich column profiling   | Low         | High — you need this to understand any dataset  |
-| 2     | Type inference          | Medium      | High — turns raw text into structured data      |
-| 3     | Duplicate detection     | Medium      | Very high — directly solves your work problem   |
-| 4     | Functional dependencies | Medium-High | High — discovers hidden structure automatically |
-| 5     | Join planning           | High        | Medium — useful but less immediately pressing   |
+| Phase | Feature                 | Status   | Effort      | Value for your work                             |
+|-------|-------------------------|----------|-------------|-------------------------------------------------|
+| 0     | Core ranking & sorting  | Done     | Low         | High — the foundation everything builds on      |
+| 1     | Rich column profiling   | Done     | Low         | High — you need this to understand any dataset  |
+| 2     | Type inference          | Done     | Medium      | High — turns raw text into structured data      |
+| 3     | Duplicate detection     | Done     | Medium      | Very high — directly solves your work problem   |
+| 4     | Functional dependencies | Done     | Medium-High | High — discovers hidden structure automatically |
+| 5     | Join planning           | Done     | High        | Medium — useful but less immediately pressing   |
