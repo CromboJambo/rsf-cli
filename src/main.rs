@@ -305,20 +305,7 @@ fn main() -> Result<()> {
                 Ok(result) => {
                     print_join_report(&result, &left, &right);
 
-                    // Build output headers.
-                    let best = &plan.candidates[result.selected_candidate_idx as usize];
-                    let mut out_headers: Vec<String> = left_headers.clone();
-                    for (j, h) in right_headers.iter().enumerate() {
-                        if j != result.selected_candidate_idx as usize || true { // all non-key cols from right
-                            // We need the actual key index - use best.col_file_2 to find it.
-                            let key_idx = right_headers.iter().position(|x| x == &best.col_file_2).unwrap();
-                            if j != key_idx {
-                                out_headers.push(format!("{}.{}", best.col_file_2, h));
-                            }
-                        }
-                    }
-
-                    write_csv(&out_headers, &vec![], output.as_deref())?; // placeholder - actual data written below
+                    write_csv(&result.output_headers, &result.output_rows_data, output.as_deref())?;
                 }
                 Err(e) => anyhow::bail!("{}", e),
             }

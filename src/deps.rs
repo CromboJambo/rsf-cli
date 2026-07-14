@@ -1,4 +1,4 @@
-use crate::ranking::{ColumnProfile, RankingOptions};
+use crate::ranking::ColumnProfile;
 use std::collections::{HashMap, HashSet};
 
 /// A functional dependency: every value of `determinant` maps to exactly one value of `dependent`.

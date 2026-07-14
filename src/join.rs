@@ -1,5 +1,4 @@
-use crate::ranking::{ColumnProfile, RankingOptions};
-use serde::{Deserialize, Serialize};
+use crate::ranking::{ColumnProfile, RankingOptions, TypeHint};
 use std::collections::{HashMap, HashSet};
 
 /// Join mode for the join operation.
@@ -166,9 +165,9 @@ fn score_candidate(
         let ratio = if max_card == 0.0 { 1.0 } else { min_card / max_card };
         score += ratio * 0.2;
     }
+
     // Unique columns are better join keys (score up to 0.1).
-    let uniqueness_bonus =
-        (prof1.unique_pct() + prof2.unique_pct()) / 200.0;
+    let uniqueness_bonus = (prof1.unique_pct() + prof2.unique_pct()) / 200.0;
     score += uniqueness_bonus.min(0.1);
 
     score.min(1.0)
@@ -181,22 +180,23 @@ fn normalize_name(name: &str) -> String {
 }
 
 /// Check type hint compatibility between two columns.
-fn type_compatibility(t1: &Option<crate::ranking::TypeHint>, t2: &Option<crate::ranking::TypeHint>) -> f64 {
-    match (t1, t2) {
-        (Some(a), Some(b)) => {
-            if a == b {
-                return 1.0; // Exact type match.
-            }
-            // Compatible numeric types.
-            matches!(
-                (a, b),
-                (crate::ranking::TypeHint::Integer, crate::ranking::TypeHint::Float)
-                    | (crate::ranking::TypeHint::Float, crate::ranking::TypeHint::Integer)
-                    | (crate::ranking::TypeHint::Currency, crate::ranking::TypeHint::Float)
-                    | (crate::ranking::TypeHint::Currency, crate::ranking::TypeHint::Integer)
-            ) as f64 * 0.8
-        }
-        _ => 0.5, // Unknown types get neutral score.
+fn type_compatibility(t1: &TypeHint, t2: &TypeHint) -> f64 {
+    if t1 == t2 {
+        return 1.0; // Exact type match.
+    }
+    // Compatible numeric types.
+    let compatible = matches!(
+        (t1, t2),
+        (TypeHint::Integer, TypeHint::Float)
+            | (TypeHint::Float, TypeHint::Integer)
+            | (TypeHint::Currency, TypeHint::Float)
+            | (TypeHint::Currency, TypeHint::Integer)
+    );
+    if compatible {
+        0.8
+    } else {
+        // Unknown types get neutral score.
+        0.5
     }
 }
 
@@ -215,9 +215,10 @@ fn candidate_reason(
         parts.push("similar column names".to_string());
     }
 
-    if let (Some(t1), Some(t2)) = (&prof1.type_hint, &prof2.type_hint) {
-        if t1 == t2 {
-            parts.push(format!("type: {:?}", t1));
+    // Only show type info when it's not Unknown.
+    if prof1.type_hint != TypeHint::Unknown && prof2.type_hint != TypeHint::Unknown {
+        if prof1.type_hint == prof2.type_hint {
+            parts.push(format!("type: {:?}", prof1.type_hint));
         } else {
             parts.push("compatible types".to_string());
         }
@@ -225,10 +226,7 @@ fn candidate_reason(
 
     let card_match = prof1.cardinality == prof2.cardinality;
     if card_match {
-        parts.push(format!(
-            "matching cardinality ({})",
-            prof1.cardinality
-        ));
+        parts.push(format!("matching cardinality ({})", prof1.cardinality));
     } else {
         parts.push(format!(
             "cardinality ratio: {:.0}%",
@@ -376,10 +374,13 @@ pub fn execute_join(
                 output_rows: output_rows.len(),
                 left_unmatched,
                 right_unmatched,
+                output_headers: out_headers.clone(),
+                output_rows_data: output_rows.clone(),
             })
         }
 
         JoinMode::FullOuter => {
+            let mut right_unmatched = 0usize;
             // Process all file 1 rows.
             for (row_idx1, row1) in rows1.iter().enumerate() {
                 if row_idx1 >= idx1 || idx1 >= row1.len() {
@@ -438,6 +439,8 @@ pub fn execute_join(
                 output_rows: output_rows.len(),
                 left_unmatched,
                 right_unmatched,
+                output_headers: out_headers.clone(),
+                output_rows_data: output_rows.clone(),
             })
         }
     }
