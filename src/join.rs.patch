@@ -1,0 +1,33 @@
+--- a//home/lappy/Projects/rsf-cli/src/join.rs
++++ b//home/lappy/Projects/rsf-cli/src/join.rs
+@@ -664,7 +664,7 @@ mod tests {
+         let result = execute_join(
+             &headers1, &rows1, &profiles1,
+             &headers2, &rows2, &profiles2,
+-            &config,
++            &config,
+         )
+         .unwrap();
+
+@@ -675,8 +675,9 @@ mod tests {
+             &config,
+         ).unwrap();
+
+-        assert_eq!(result.output_rows, 3); // Alice+match + right-only row.
++        // File1: id=1; File2: id=1 (matched), id=3 (right-only).
++        // Output should have: match row + right-only = 2 rows.
++        assert_eq!(result.output_rows, 2);
+     }
+
+     #[test]
+@@ -579,8 +580,8 @@ mod tests {
+     fn test_no_candidate() {
+         let headers1 = vec!["amount_usd".to_string(), "quantity".to_string()];
+-        let rows1 = vec![vec!["99.99".to_string(), "5".to_string()]];
+-        let rows2 = vec!["order_date".to_string(), "customer_id".to_string()];
++        let headers2 = vec!["order_date".to_string(), "customer_id".to_string()];
++        let rows1 = vec![vec!["99.99".to_string(), "5".to_string()]];
++        let rows2 = vec![vec!["2024-01-15".to_string(), "CUST001".to_string()]];
+
+         let profiles1 = make_profiles(&headers1, &rows1);
+         let profiles2 = make_profiles(&headers2, &rows2);
