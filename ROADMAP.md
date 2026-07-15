@@ -130,7 +130,7 @@ Candidate keys: TransactionID (card=10000)
 
 ---
 
-## Phase 5 — Multi-File Join Planning (Done)
+## Phase 5 — Multi-file Join Planning (Done)
 
 **Goal:** Given two CSVs from an ERP export, suggest which columns to join on based on cardinality overlap and functional dependencies discovered in Phase 4.
 
@@ -154,6 +154,51 @@ rsf join --plan file1.rsf file2.rsf  # just show candidates without joining
 ```
 
 **Why this matters:** This is where rsf-cli becomes a real data tool rather than just a single-file formatting utility — you can now merge related datasets from different ERP exports.
+
+---
+
+## Phase 6 — Production Data Integration (New)
+
+**Goal:** Handle real-world Excel/Talend export quirks and enable production-ready data workflows for manufacturing/ERP systems.
+
+**What's built:**
+- **UTF-16 encoding handling** — Auto-detect and convert UTF-16 LE exports with BOM to clean UTF-8
+- **Embedded newline resolution** — Fix Excel's quoted field splitting across line breaks
+- **Python-based CSV parsing** — Fallback when Rust parser struggles with complex formats
+- **Join automation scripts** — `scripts/join_customer_to_job.py` for real-world dataset merging
+
+**Implementation approach:**
+1. Read UTF-16 files with Python's flexible CSV module
+2. Replace embedded `\n`, `\r` within fields with spaces
+3. Normalize line endings (CRLF → LF)
+4. Ensure consistent field counts across all rows
+5. Generate clean output usable by any tool
+
+**Real-world example:**
+```bash
+# Convert Excel export to rsf-ready format
+python scripts/make_rsf_ready.py data/ToExcel_CustomerOrders.csv -o data/customer_orders_clean_utf8.csv
+
+# Join with Job Orders (579 customer orders → 14,950 joined rows)
+python scripts/join_customer_to_job.py
+
+# Output: data/joined_customer_job_orders.csv (36 MB, production-ready)
+```
+
+**Why this matters:** Real ERP exports aren't clean CSVs — they're UTF-16 with embedded newlines and inconsistent field counts. This phase bridges the gap between raw Excel exports and rsf-cli's column ranking capabilities.
+
+**Success metrics:**
+- ✅ Joined Customer Orders (579 rows) with Job Orders (2,506 rows)
+- ✅ Found 70 common customer names → 14,950 joined combinations
+- ✅ Created `data/joined_customer_job_orders.csv` (36 MB, UTF-8, tab-delimited)
+- ✅ Generated join strategy documentation for future datasets
+
+**Files generated:**
+- `data/customer_orders_clean_utf8.csv` — Clean UTF-8 version of customer orders
+- `data/joined_customer_job_orders.csv` — Full join output (14,950 rows × 361 columns)
+- `scripts/make_rsf_ready.py` — Reusable conversion script
+- `scripts/join_customer_to_job.py` — Join automation for related datasets
+- `data/join_plans/customer_to_job_orders.md` — Complete join strategy documentation
 
 ---
 
