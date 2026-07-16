@@ -9,7 +9,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
 // Import ranking module for schema generation
-use crate::ranking::{ColumnMeta, ColumnProfile, RankingOptions, Schema};
+use crate::ranking::{ColumnMeta, RankingOptions, Schema};
 use crate::ranking::compute_profiles;
 
 /// Configuration for production data conversion
@@ -85,8 +85,8 @@ fn utf16le_to_utf8(bytes: &[u8]) -> Result<String> {
 
 /// Clean a single field: replace embedded newlines with spaces, truncate if needed
 fn clean_field(field: &str, max_length: usize) -> String {
-    // Replace line breaks and carriage returns with space
-    let cleaned = field.replace('\n', " ").replace('\r', " ");
+    // Replace CRLF first, then LF (handles \r\n and standalone \n properly)
+    let cleaned = field.replace("\r\n", " ").replace('\n', " ").replace('\r', " ");
 
     // Truncate to max length
     if cleaned.len() > max_length {
@@ -147,7 +147,7 @@ fn read_flexible_csv(path: &Path) -> Result<(Vec<String>, Vec<Vec<String>>)> {
             }
             '\n' | '\r' if !in_quotes => {
                 // Line break outside quotes = new line
-                let mut normalized_line = current_line.replace('\r', "");
+                let normalized_line = current_line.replace('\r', "");
                 lines.push(normalized_line);
                 current_line.clear();
             }

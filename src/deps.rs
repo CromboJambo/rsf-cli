@@ -64,7 +64,7 @@ pub fn find_functional_dependencies(
         };
     }
 
-    let num_rows = rows.len();
+    let _num_rows = rows.len();
     let mut fds: Vec<FunctionalDependency> = Vec::new();
     let mut pairs_analyzed = 0usize;
 

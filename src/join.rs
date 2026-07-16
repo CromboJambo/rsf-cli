@@ -290,7 +290,7 @@ pub fn execute_join(
 
     match config.mode {
         JoinMode::Inner => {
-            for (row_idx1, row1) in rows1.iter().enumerate() {
+            for (_row_idx1, row1) in rows1.iter().enumerate() {
                 if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
@@ -331,7 +331,7 @@ pub fn execute_join(
         }
 
         JoinMode::Left => {
-            for (row_idx1, row1) in rows1.iter().enumerate() {
+            for (_row_idx1, row1) in rows1.iter().enumerate() {
                 if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
@@ -352,7 +352,7 @@ pub fn execute_join(
                 } else {
                     // Left-only row: pad with empty strings for file 2 columns.
                     let mut out_row = row1.clone();
-                    for (j, h) in headers2.iter().enumerate() {
+                    for (j, _h) in headers2.iter().enumerate() {
                         if j != idx2 {
                             out_row.push(format!("{}.{}", candidate.col_file_2, ""));
                         }
@@ -382,7 +382,7 @@ pub fn execute_join(
         JoinMode::FullOuter => {
             let mut right_unmatched = 0usize;
             // Process all file 1 rows.
-            for (row_idx1, row1) in rows1.iter().enumerate() {
+            for (_row_idx1, row1) in rows1.iter().enumerate() {
                 if idx1 >= row1.len() {
                     left_unmatched += 1;
                     continue;
@@ -402,7 +402,7 @@ pub fn execute_join(
                     }
                 } else {
                     let mut out_row = row1.clone();
-                    for (j, h) in headers2.iter().enumerate() {
+                    for (j, _h) in headers2.iter().enumerate() {
                         if j != idx2 {
                             out_row.push(format!("{}.{}", candidate.col_file_2, ""));
                         }
@@ -413,7 +413,7 @@ pub fn execute_join(
             }
 
             // Add right-only rows (not matched by any file 1 row).
-            for (row_idx2, row2) in rows2.iter().enumerate() {
+            for (_row_idx2, row2) in rows2.iter().enumerate() {
                 if idx2 >= row2.len() {
                     continue;
                 }
@@ -447,7 +447,7 @@ pub fn execute_join(
 }
 
 /// Normalize a join key value for comparison.
-fn normalize_join_key(value: &str, config: &JoinConfig) -> String {
+fn normalize_join_key(value: &str, _config: &JoinConfig) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return "NULL".to_string();
@@ -470,7 +470,7 @@ pub fn print_plan_report(result: &JoinPlanResult, file1_name: &str, file2_name: 
     if !result.candidates.is_empty() {
         eprintln!("\n--- Top Candidates ---");
         for (i, c) in result.candidates.iter().enumerate().take(5) {
-            let conf_pct = (c.confidence * 100.0).round();
+            let _conf_pct = (c.confidence * 100.0).round();
             eprintln!(
                 "  {}. {} ↔ {}  [confidence: {:.0}%]",
                 i + 1,

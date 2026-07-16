@@ -165,7 +165,7 @@ pub fn find_duplicates(
 /// By default, uses the first `n` columns (positional).
 pub fn determine_key_columns_for_report(
     headers: &[String],
-    rows: &[Vec<String>],
+    _rows: &[Vec<String>],
     n: usize,
 ) -> Vec<usize> {
     let num_key_cols = n.min(headers.len());
