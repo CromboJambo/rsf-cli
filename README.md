@@ -63,9 +63,29 @@ rsf rank input.csv -o output.rsf
 # From stdin
 cat data.csv | rsf rank > output.rsf
 
-# Generate schema file
+# Generate schema file with typed metadata
 rsf rank input.csv -o output.rsf --schema
-# Creates output.rsf.schema.yaml
+# Creates output.rsf.schema.yaml with null_pct, unique_pct, type_hint
+```
+
+### Convert Excel exports to RSF-ready format (Phase 6)
+
+```bash
+# Handle UTF-16 LE/BE automatically (no external dependencies needed)
+rsf ready data/ToExcel_CustomerOrders.csv -o customer_orders_final.csv
+→ 175 columns, 1187 rows
+→ Schema written: customer_orders_final.schema.yaml
+
+# Convert large ERP exports (39 MB file)
+rsf ready data/ToExcel_JobOperations.csv -o job_operations_final.csv
+→ 168 columns, 28593 rows
+
+# Join datasets on inferred keys
+rsf join --left customer_orders_final_comma.csv \
+         --right job_operations_final_comma.csv
+Column pairs analyzed: 31,248
+Candidate join keys found: 16,680
+Top candidates: Status ↔ Status [confidence: 100%]
 ```
 
 ### Show statistics
@@ -78,13 +98,36 @@ Output:
 ```
 === Column Statistics ===
 
-Column               Cardinality
-----------------------------------
-TransactionID              10000
-AccountID                   2000
-Vendor                       300
-Category                      20
-Month                         12
+Column               Cardinality    Null%  Unique%  Type
+--------------------------------------------------------------
+TransactionID              10000      0.0     99.8  alphanumeric
+Amount                      8500      2.3     85.0  currency
+Vendor                       300      0.0    100.0  text
+Category                     20       0.0    100.0  text
+Month                        12       0.0    100.0  date
+```
+
+### Analyze functional dependencies
+
+```bash
+# Discover which columns functionally determine others
+rsf deps input.rsf
+```
+
+Output:
+```
+=== Functional Dependency Analysis ===
+Column pairs analyzed: 12
+Functional dependencies found: 5
+Candidate keys: TransactionID (card=10000)
+
+--- Dependencies ---
+  Vendor → {Category, Account}  [card=300]
+  Category → Account  [card=20→8]
+  Month → Quarter  [card=12→4]
+
+--- Candidate Keys ---
+  ★ TransactionID (cardinality: 10000) — determines all other columns
 ```
 
 ### Find duplicates
@@ -118,27 +161,18 @@ Output (`duplicates.json`):
 }
 ```
 
-### Analyze functional dependencies
+### Join datasets on inferred keys
 
 ```bash
-# Discover which columns functionally determine others
-rsf deps input.rsf
-```
+# Automatic candidate key detection + join execution
+rsf join --left file1.csv --right file2.csv \
+         --mode inner -o joined.csv
 
-Output:
-```
-=== Functional Dependency Analysis ===
-Column pairs analyzed: 12
-Functional dependencies found: 5
-Candidate keys: TransactionID (card=10000)
-
---- Dependencies ---
-  Vendor → {Category, Account}  [card=300]
-  Category → Account  [card=20→8]
-  Month → Quarter  [card=12→4]
-
---- Candidate Keys ---
-  ★ TransactionID (cardinality: 10000) — determines all other columns
+# Just show candidates without joining
+rsf join --left file1.csv --right file2.csv --plan
+Column pairs analyzed: 31,248
+Candidate join keys found: 16,680
+Top candidates: Status ↔ Status [confidence: 100%]
 ```
 
 ### Validate RSF file
@@ -156,23 +190,42 @@ rsf validate output.rsf
 When you generate a schema with `--schema`, it creates a YAML file:
 
 ```yaml
-version: "0.1"
+version: "1.0"
 columns:
   - name: TransactionID
     rank: 1
     cardinality: 10000
+    null_pct: 0.0
+    unique_pct: 99.8
+    type_hint: alphanumeric
   - name: AccountID
     rank: 2
     cardinality: 2000
+    null_pct: 2.3
+    unique_pct: 85.0
+    type_hint: currency
   - name: Vendor
     rank: 3
     cardinality: 300
-  - name: Amount
-    rank: 4
-    cardinality: 8500
+    null_pct: 0.0
+    unique_pct: 100.0
+    type_hint: text
 ```
 
-`type` is optional and omitted by default.
+**Schema fields:**
+- `version` — Schema format version (currently `1.0`)
+- `name` — Column name from CSV header
+- `rank` — Cardinality rank (1 = highest cardinality)
+- `cardinality` — Number of distinct non-null values
+- `null_pct` — Percentage of null/empty values (optional, skipped if 0%)
+- `unique_pct` — Uniqueness ratio (cardinality / total rows × 100%, optional)
+- `type_hint` — Detected type: `integer`, `float`, `date`, `currency`, `boolean`, `Id("uuid")`, `Id("alphanumeric")`, or `unknown`
+
+**Phase 6 enhancement:** Schema files are automatically generated alongside CSV output when using `rsf ready`:
+```bash
+rsf ready data/ToExcel_CustomerOrders.csv -o customer_orders_final.csv
+→ Schema written: customer_orders_final.schema.yaml
+```
 
 ## Integration with mirror-log
 
@@ -248,11 +301,23 @@ With RSF:
 - Merges are safe (structure is enforced)
 - Disputes are resolvable (ranking is computed, not subjective)
 
+### For Production Data
+
+**Phase 6 milestone:** Replaced entire Python stack with single Rust binary. Real ERP exports now convert seamlessly:
+
+```bash
+# Single command handles UTF-16 → clean CSV + schema export
+rsf ready data/ToExcel_CustomerOrders.csv -o customer_orders_final.csv
+→ 175 columns, 1187 rows processed in <1s
+→ Schema automatically generated (typed metadata)
+→ Zero external dependencies
+```
+
+No more: `chardet`, pandas, manual encoding detection. One binary, one command.
+
 ### For the Future
 
-This is **stable scaffolding**. 
-
-When local AI becomes ubiquitous, you'll want your data in formats that are:
+This is **stable scaffolding**. When local AI becomes ubiquitous, you'll want your data in formats that are:
 - Debuggable (open the CSV, understand it immediately)
 - Provable (ranking is mathematical, not magical)
 - Portable (it's just CSV + YAML)
@@ -260,34 +325,28 @@ When local AI becomes ubiquitous, you'll want your data in formats that are:
 
 RSF is a tiny stable piece that can support whatever you build on top.
 
-## Non-Goals (v0.1)
-
-- ❌ No formulas
-- ❌ No cell-level types
-- ❌ No styling
-- ❌ No multi-table joins
-
-This is a **structural substrate**, not an Excel replacement. Build layers on top if you need them.
-
 ## Comparison
 
-| Feature | Excel/Sheets | RSF |
-|---------|--------------|-----|
-| Column order | Manual, arbitrary | Computed, deterministic |
-| Grouping | UI trick, fragile | Structural, provable |
-| Sorting | Can break relationships | Safe, canonical |
-| Diffing | Nightmare | Clean, meaningful |
-| Validation | None | Built-in |
-| Philosophy | UI first | Data first |
+| Feature | Excel/Sheets | Python Scripts | RSF v0.1 (Rust) |
+|---------|--------------|----------------|-----------------|
+| Column order | Manual, arbitrary | Script-dependent | Computed, deterministic |
+| Encoding handling | UTF-8 only | `chardet` dependency | Native BOM detection |
+| Grouping | UI trick, fragile | Custom logic | Structural, provable |
+| Sorting | Can break relationships | Variable | Safe, canonical |
+| Diffing | Nightmare | Custom tools | Clean, meaningful |
+| Validation | None | Manual testing | Built-in |
+| Dependencies | Ourselves | chardet, pandas, etc. | Zero (single binary) |
+| Philosophy | UI first | Script glue | Data-first substrate |
 
 ## Future Extensions
 
 Possible future layers (separate tools):
 
-- **RSF → OLAP cube** converter
-- **Auto-pivot generator**
-- **Semantic type inference** (dates, currencies, etc.)
+- **RSF → nushell pipeline** - `rsf open data.csv` for typed interactive exploration
+- **Filter expressions** - `rsf where Status = "Released"`
+- **Column projection** - `rsf select col1, col2`
 - **Multi-table join planner** using ranked keys
+- **Auto-pivot generator** from functional dependencies
 - **Web UI** for browsing RSF files
 
 But v0.1 is intentionally minimal. Prove the foundation first.

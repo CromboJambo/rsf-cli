@@ -2,6 +2,7 @@ mod dedup;
 mod deps;
 mod errors;
 mod join;
+mod ready;
 mod ranking;
 
 use anyhow::{Context, Result};
@@ -118,6 +119,16 @@ enum Commands {
         /// Floating-point tolerance for near-match on numeric columns (default: 0.01)
         #[arg(long, default_value_t = 0.01)]
         tolerance: f64,
+    },
+
+    /// Convert production Excel export to RSF-ready format
+    Ready {
+        /// Input CSV file (UTF-16 or UTF-8)
+        input: String,
+
+        /// Output file (defaults to <input>_rsf_ready.csv)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
 }
 
@@ -309,6 +320,18 @@ fn main() -> Result<()> {
                 }
                 Err(e) => anyhow::bail!("{}", e),
             }
+        }
+
+        Commands::Ready { input, output } => {
+            use crate::ready::{make_rsf_ready, ReadyConfig};
+
+            let config = ReadyConfig::default();
+
+            make_rsf_ready(
+                &PathBuf::from(&input),
+                output.as_deref(),
+                config,
+            )?;
         }
     }
 
