@@ -297,4 +297,4 @@ The **methodology** is yours to share; the **data stays private**.
 
 ---
 
-*Generated July 2024 — Pure logic, no proprietary data exposure.*
+*Generated July 2026 — Pure logic, no proprietary data exposure.*
