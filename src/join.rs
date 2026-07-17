@@ -282,11 +282,26 @@ pub fn execute_join(
             out_headers.push(format!("{}.{}", candidate.col_file_2, h));
         }
     }
+    let expected_len = out_headers.len();
 
     // Execute the join.
     let mut output_rows: Vec<Vec<String>> = Vec::new();
     let mut left_unmatched = 0usize;
     let mut matched_keys: HashSet<String> = HashSet::new();
+
+    // Helper function to ensure a row has enough cells.
+    fn pad_row(row: &Vec<String>, target_len: usize) -> Vec<String> {
+        if row.len() <= target_len {
+            let mut padded = row.clone();
+            while padded.len() < target_len {
+                padded.push(String::new());
+            }
+            padded
+        } else {
+            // Truncate to target length (including join key column).
+            row[..target_len].to_vec()
+        }
+    }
 
     match config.mode {
         JoinMode::Inner => {
@@ -299,8 +314,12 @@ pub fn execute_join(
                 if let Some(indices) = idx_map.get(&key) {
                     for &idx2 in indices {
                         matched_keys.insert(key.clone());
-                        let mut out_row = row1.clone();
-                        for (j, val) in rows2[idx2].iter().enumerate() {
+                        // Get file2 row and ensure it has enough cells.
+                        let row2_padded: Vec<String> = pad_row(&rows2[idx2], headers2.len());
+                        // Get file1 row and truncate to expected length.
+                        let row1_truncated: Vec<String> = pad_row(row1, headers1.len());
+                        let mut out_row: Vec<String> = row1_truncated.clone();
+                        for (j, val) in row2_padded.iter().enumerate() {
                             if j != idx2 {
                                 out_row.push(format!("{}.{}", candidate.col_file_2, val));
                             }
@@ -341,8 +360,12 @@ pub fn execute_join(
 
                 if let Some(indices) = idx_map.get(&key) {
                     for &idx2 in indices {
-                        let mut out_row = row1.clone();
-                        for (j, val) in rows2[idx2].iter().enumerate() {
+                        // Get file2 row and ensure it has enough cells.
+                        let row2_padded: Vec<String> = pad_row(&rows2[idx2], headers2.len());
+                        // Get file1 row and truncate to expected length.
+                        let row1_truncated: Vec<String> = pad_row(row1, headers1.len());
+                        let mut out_row: Vec<String> = row1_truncated.clone();
+                        for (j, val) in row2_padded.iter().enumerate() {
                             if j != idx2 {
                                 out_row.push(format!("{}.{}", candidate.col_file_2, val));
                             }
@@ -392,8 +415,12 @@ pub fn execute_join(
 
                 if let Some(indices) = idx_map.get(&key) {
                     for &idx2 in indices {
-                        let mut out_row = row1.clone();
-                        for (j, val) in rows2[idx2].iter().enumerate() {
+                        // Get file2 row and ensure it has enough cells.
+                        let row2_padded: Vec<String> = pad_row(&rows2[idx2], headers2.len());
+                        // Get file1 row and truncate to expected length.
+                        let row1_truncated: Vec<String> = pad_row(row1, headers1.len());
+                        let mut out_row: Vec<String> = row1_truncated.clone();
+                        for (j, val) in row2_padded.iter().enumerate() {
                             if j != idx2 {
                                 out_row.push(format!("{}.{}", candidate.col_file_2, val));
                             }
