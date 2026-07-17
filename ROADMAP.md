@@ -4,12 +4,17 @@
 
 | Phase | Feature                    | Status     |
 |-------|----------------------------|------------|
-| 0     | Core ranking & sorting     | ✅ Done    |
-| 1     | Rich column profiling      | ✅ Done    |
-| 2     | Type inference             | ✅ Done    |
-| 3     | Duplicate detection        | ✅ Done    |
-| 4     | Functional dependencies    | ✅ Done    |
-| 5     | Multi-file join planning   | ✅ Done    |
+| Phase | Feature                    | Status     | Edge Cases Covered | Resolved Concerns |
+|-------|----------------------------|------------|--------------------|-------------------|
+| 0     | Core ranking & sorting     | ✅ Done    | Cardinality ordering edge cases, canonical sort failures | Foundation stability |
+| 1     | Rich column profiling      | ✅ Done    | Null detection (empty strings), constant columns, type inference gaps | Column understanding for decisions |
+| 2     | Type inference             | ✅ Done    | Currency symbol detection ($/€/£/¥/₹), date format variants, boolean patterns | Structured data from raw text |
+| 3     | Duplicate detection        | ✅ Done    | Multiple copies of same transaction, currency formatting variations, rounding errors, whitespace-only keys, unicode names | Cost accounting discrepancies resolution |
+| 4     | Functional dependencies    | ✅ Done    | Hidden relational structure discovery, candidate key identification, determinant ranking | ERP data relationship mapping |
+| 5     | Multi-file join planning   | ✅ DONE   | Candidate keys across files, confidence scoring (exact name match + compatible types), unmatched row counts | Related dataset merge capability |
+| 6     | Production data integration| ✅ DONE   | UTF-16 LE/BE BOM detection, embedded newlines in quoted fields, field normalization, typed schema export | Excel/Talend export bridge to rsf-cli |
+
+---\n\n## Summary\n|| Phase | Feature                 | Status   | Effort      | Value for your work                             |\n||-------|-------------------------|----------|-------------|-------------------------------------------------|\n|| 0     | Core ranking & sorting  | Done     | Low         | High — the foundation everything builds on      |\
 
 ---
 
