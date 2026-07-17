@@ -20,3 +20,4 @@ Thumbs.db
 *.schema.yaml
 output.*
 data/
+sorted/
