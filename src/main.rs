@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
-use crate::errors::IntoAnyhow;
+use crate::errors::{RsfError};
 use crate::deps::{find_functional_dependencies, print_report as print_fd_report, FdConfig};
 use crate::join::{execute_join, find_join_candidates, print_join_report, print_plan_report, JoinConfig, JoinMode};
 use crate::ranking::{
@@ -145,11 +145,11 @@ fn main() -> Result<()> {
             let (headers, rows) = read_csv(&input)?;
             let options = ranking_options(nulls_distinct);
             let ranked_columns =
-                rank_columns(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
+                rank_columns(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             // Reorder data
             let (new_headers, new_rows) =
-                reorder_data(&headers, &rows, &ranked_columns).map_err(IntoAnyhow::into_anyhow)?;
+                reorder_data(&headers, &rows, &ranked_columns).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             // Sort rows canonically
             let sorted_rows = sort_rows_canonical(&new_rows);
@@ -164,7 +164,7 @@ fn main() -> Result<()> {
                     .map(|p| PathBuf::from(format!("{}.schema.yaml", p.display())))
                     .unwrap_or_else(|| PathBuf::from("output.schema.yaml"));
 
-                write_schema(&ranked_columns, &schema_path).map_err(IntoAnyhow::into_anyhow)?;
+                write_schema(&ranked_columns, &schema_path).map_err(|e| anyhow::anyhow!("{}", e))?;
                 eprintln!("Schema written to: {}", schema_path.display());
             }
 
@@ -200,7 +200,7 @@ fn main() -> Result<()> {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
-            let stats = rank_columns(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let stats = rank_columns(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             println!("\n=== Column Statistics ===\n");
             println!(
@@ -245,7 +245,7 @@ fn main() -> Result<()> {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
-            let profiles = compute_profiles(&headers, &rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             let config = FdConfig {
                 treat_empty_as_null,
@@ -264,7 +264,7 @@ fn main() -> Result<()> {
                 trim_whitespace: true,
             };
 
-            let result = dedup::find_duplicates(&headers, &rows, &config).map_err(IntoAnyhow::into_anyhow)?;
+            let result = dedup::find_duplicates(&headers, &rows, &config).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             // Print report to stderr
             let key_indices = dedup::determine_key_columns_for_report(&headers, &rows, keys);
@@ -291,8 +291,8 @@ fn main() -> Result<()> {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
-            let left_profiles = compute_profiles(&left_headers, &left_rows, options).map_err(IntoAnyhow::into_anyhow)?;
-            let right_profiles = compute_profiles(&right_headers, &right_rows, options).map_err(IntoAnyhow::into_anyhow)?;
+            let left_profiles = compute_profiles(&left_headers, &left_rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+            let right_profiles = compute_profiles(&right_headers, &right_rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             // Print join plan to stderr.
             let plan = find_join_candidates(&left_headers, &left_profiles, &right_headers, &right_profiles);
@@ -414,7 +414,7 @@ fn validate_rsf(csv_path: &PathBuf, schema_path: &PathBuf) -> Result<()> {
     // Read CSV
     let (headers, rows) = read_csv_file(csv_path)?;
 
-    validate_column_order(&headers, &schema.columns).map_err(IntoAnyhow::into_anyhow)?;
+    validate_column_order(&headers, &schema.columns).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     // Validate ranks are sequential
     for (idx, col_meta) in schema.columns.iter().enumerate() {
@@ -430,9 +430,9 @@ fn validate_rsf(csv_path: &PathBuf, schema_path: &PathBuf) -> Result<()> {
 
     let options = ranking_options(true);
     validate_cardinality_order(&headers, &rows, &schema.columns, options)
-        .map_err(IntoAnyhow::into_anyhow)?;
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-    validate_sorted(&rows).map_err(IntoAnyhow::into_anyhow)?;
+    validate_sorted(&rows).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     Ok(())
 }

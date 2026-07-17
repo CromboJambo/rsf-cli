@@ -281,15 +281,14 @@ fn generate_schema(
     rows: &[Vec<String>],
     csv_path: &Path,
 ) -> Result<Option<std::path::PathBuf>> {
-    use crate::errors::IntoAnyhow;
-
     // Compute column profiles
     let options = RankingOptions {
         treat_empty_as_null: true,
         include_nulls: false,
     };
 
-    let profiles = compute_profiles(header, rows, options).map_err(IntoAnyhow::into_anyhow)?;
+    let profiles = compute_profiles(header, rows, options)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
     // Build schema
     let columns: Vec<ColumnMeta> = header

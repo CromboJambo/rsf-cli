@@ -17,6 +17,9 @@ anyhow = "1.0"
 encoding_rs_io = "0.1.7"
 regex = "1.10"
 
+# Semantic model layer (pure representation, no CLI/Excel/Git knowledge)
+rsf = { path = "../rsf-core" }
+
 [profile.release]
 strip = true
 opt-level = "z"
