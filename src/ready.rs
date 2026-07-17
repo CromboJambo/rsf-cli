@@ -136,7 +136,7 @@ fn read_flexible_csv(path: &Path) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let mut lines = Vec::new();
     let mut current_line = String::new();
     let mut in_quotes = false;
-
+    
     for ch in content.chars() {
         match ch {
             '"' if !in_quotes => {
@@ -161,24 +161,48 @@ fn read_flexible_csv(path: &Path) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     if !current_line.is_empty() {
         lines.push(current_line);
     }
+    
+    // Detect delimiter from header (comma or tab)
+    let header = &lines[0];
+    let is_comma_delimited = header.contains('"') && header.chars().filter(|&c| c == ',').count() > 5;
+    let delimiter = if is_comma_delimited { ',' } else { '\t' };
 
-    if lines.is_empty() {
-        anyhow::bail!("Empty file");
+    // Parse fields from each line using the detected delimiter
+    let mut parsed_rows: Vec<Vec<String>> = Vec::new();
+    
+    for line in lines {
+        // Simple field splitting with quote stripping
+        let mut fields: Vec<String> = Vec::new();
+        
+        // Split on tabs first (Excel exports are tab-delimited)
+        let raw_fields: Vec<&str> = line.split('\t').collect();
+        
+        for field in raw_fields {
+            // Strip surrounding quotes if present
+            let cleaned = if field.starts_with('"') && field.ends_with('"') && field.len() > 1 {
+                field[1..field.len()-1].to_string()
+            } else {
+                field.to_string()
+            };
+            
+            fields.push(cleaned);
+        }
+        
+        parsed_rows.push(fields);
     }
 
-    // Parse header and rows
-    let delimiter = '\t'; // Excel exports are typically tab-delimited
+    if parsed_rows.is_empty() {
+        anyhow::bail!("Empty file");
+    }
 
     let mut header: Vec<String> = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
 
-    for (idx, line) in lines.iter().enumerate() {
-        let fields: Vec<String> = line.split(delimiter).map(|f| f.to_string()).collect();
-
+    for (idx, line) in parsed_rows.iter().enumerate() {
         if idx == 0 {
-            header = fields;
+            header = line.clone();
         } else {
-            rows.push(fields);
+            rows.push(line.clone());
         }
     }
 
