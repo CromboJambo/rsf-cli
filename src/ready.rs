@@ -162,32 +162,48 @@ fn read_flexible_csv(path: &Path) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         lines.push(current_line);
     }
     
-    // Detect delimiter from header (comma or tab)
+    // Detect delimiter by counting occurrences in the header line.
+    // Tab-delimited files (common Excel exports) have fewer commas than tabs,
+    // while comma-delimited files have more commas than tabs.
     let header = &lines[0];
-    let is_comma_delimited = header.contains('"') && header.chars().filter(|&c| c == ',').count() > 5;
-    let delimiter = if is_comma_delimited { ',' } else { '\t' };
+    let tab_count = header.matches('\t').count();
+    let comma_count = header.chars().filter(|&c| c == ',').count();
+
+    // Heuristic: if there are more tabs than commas, it's likely tab-delimited.
+    // If there are more commas and the line contains quoted fields, it's comma-delimited.
+    let delimiter = if tab_count > 0 && (tab_count >= comma_count || !header.contains('"')) {
+        '\t'
+    } else if comma_count > 0 {
+        ','
+    } else {
+        // Default to tab for Excel exports, but fall back to comma.
+        '\t'
+    };
 
     // Parse fields from each line using the detected delimiter
     let mut parsed_rows: Vec<Vec<String>> = Vec::new();
-    
+
     for line in lines {
-        // Simple field splitting with quote stripping
+        // Split on the detected delimiter
+        let raw_fields: Vec<&str> = if delimiter == '\t' {
+            line.split('\t').collect()
+        } else {
+            line.split(',').collect()
+        };
+
         let mut fields: Vec<String> = Vec::new();
-        
-        // Split on tabs first (Excel exports are tab-delimited)
-        let raw_fields: Vec<&str> = line.split('\t').collect();
-        
+
         for field in raw_fields {
-            // Strip surrounding quotes if present
+            // Strip surrounding quotes if present (handles CSV quoting)
             let cleaned = if field.starts_with('"') && field.ends_with('"') && field.len() > 1 {
                 field[1..field.len()-1].to_string()
             } else {
                 field.to_string()
             };
-            
+
             fields.push(cleaned);
         }
-        
+
         parsed_rows.push(fields);
     }
 
