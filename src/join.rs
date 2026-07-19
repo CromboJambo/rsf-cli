@@ -282,7 +282,6 @@ pub fn execute_join(
             out_headers.push(format!("{}.{}", candidate.col_file_2, h));
         }
     }
-    let expected_len = out_headers.len();
 
     // Execute the join.
     let mut output_rows: Vec<Vec<String>> = Vec::new();
@@ -474,14 +473,24 @@ pub fn execute_join(
 }
 
 /// Normalize a join key value for comparison.
-fn normalize_join_key(value: &str, _config: &JoinConfig) -> String {
+fn normalize_join_key(value: &str, config: &JoinConfig) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return "NULL".to_string();
     }
-    // For numeric columns, use tolerance-based matching.
+    // For numeric columns, use tolerance-based matching while preserving precision.
     if let Ok(f) = trimmed.parse::<f64>() {
-        format!("{:.10}", f)
+        // Use the original string representation for exact integer-like values
+        // to avoid floating-point rounding issues. Only apply formatting when
+        // there's an actual fractional component that needs normalization.
+        if f.fract() == 0.0 && f.abs() < 1e15 {
+            // Integer value - use original string to preserve exact representation
+            trimmed.to_lowercase()
+        } else {
+            // Fractional value - normalize with high precision, then trim trailing zeros
+            let normalized = format!("{:.15}", f);
+            normalized.trim_end_matches('0').trim_end_matches('.').to_string()
+        }
     } else {
         trimmed.to_lowercase()
     }
