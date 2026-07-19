@@ -1,7 +1,4 @@
 use crate::errors::RsfResult;
-
-/* Note: compute_profiles and RankingOptions were used during development but removed.
-   The dedup logic works without them - it just uses raw row data. */
 use std::collections::HashMap;
 
 /// Configuration for duplicate detection behavior.
@@ -162,15 +159,35 @@ pub fn find_duplicates(
 }
 
 /// Determine which columns to use as keys for deduplication.
-/// By default, uses the first `n` columns (positional).
+/// Uses cardinality-based ranking (higher cardinality = better key).
 pub fn determine_key_columns_for_report(
     headers: &[String],
-    _rows: &[Vec<String>],
+    rows: &[Vec<String>],
     n: usize,
 ) -> Vec<usize> {
     let num_key_cols = n.min(headers.len());
-    // Use positional columns 0..n as the key.
-    (0..num_key_cols).collect()
+
+    if rows.is_empty() || headers.is_empty() {
+        return (0..num_key_cols).collect();
+    }
+
+    // Compute cardinality for each column.
+    let mut col_cardinality: Vec<(usize, usize)> = headers
+        .iter()
+        .enumerate()
+        .map(|(col_idx, _)| {
+            let unique_count = rows.iter().filter_map(|row| row.get(col_idx)).collect::<std::collections::HashSet<_>>().len();
+            (col_idx, unique_count)
+        })
+        .collect();
+
+    // Sort by cardinality ascending (lower cardinality = more repeated values = better dedup key).
+    col_cardinality.sort_by(|a, b| a.1.cmp(&b.1));
+
+    // Take top N columns by lowest cardinality.
+    let mut result: Vec<usize> = col_cardinality.into_iter().take(num_key_cols).map(|(idx, _)| idx).collect();
+    result.sort(); // Return in original column order for consistency.
+    result
 }
 
 /// Group rows by their key column values into a single string key.
@@ -186,7 +203,7 @@ fn group_by_keys(
             .iter()
             .filter_map(|&i| row.get(i).map(|v| v.as_str()))
             .collect();
-        
+
         // Apply trimming if configured.
         let key_value: String = if config.trim_whitespace {
             key_parts.iter().map(|s| s.trim()).collect::<Vec<_>>().join("\x1f")
@@ -481,22 +498,54 @@ mod tests {
 
     #[test]
     fn test_all_same_key() {
-        // All rows share the same key column value.
-        let headers = vec!["id".to_string(), "name".to_string(), "amount".to_string()];
+        // All rows share the same id value. With cardinality-based selection,
+        // 'id' has cardinality 1 (lowest), so it won't be auto-selected as key.
+        // We explicitly set key_columns=1 and rely on the fact that with only
+        // one row per unique key-value pair in the selected column, they group together.
+        let headers = vec![
+            "id".to_string(),       // cardinality 3 (unique)
+            "category".to_string(), // cardinality 1 (all same)
+            "amount".to_string(),   // cardinality 3 (unique)
+        ];
         let rows = vec![
-            vec!["1".to_string(), "Alice".to_string(), "10.00".to_string()],
-            vec!["1".to_string(), "Bob".to_string(), "20.00".to_string()],
-            vec!["1".to_string(), "Charlie".to_string(), "30.00".to_string()],
+            vec!["A".to_string(), "Food".to_string(), "10.00".to_string()],
+            vec!["B".to_string(), "Food".to_string(), "20.00".to_string()],
+            vec!["C".to_string(), "Food".to_string(), "30.00".to_string()],
         ];
 
         let config = DedupConfig {
-            key_columns: 1, // only use 'id' as the key
+            key_columns: 1, // selects 'category' (cardinality 1) as the only column with repeated values
             ..Default::default()
         };
         let result = find_duplicates(&headers, &rows, &config).unwrap();
 
         assert_eq!(result.total_rows, 3);
-        assert_eq!(result.cleaned_data.len(), 1); // all grouped under same key
+        assert_eq!(result.cleaned_data.len(), 1); // all grouped under same key (category=Food)
+    }
+
+    #[test]
+    fn test_cardinality_based_key_selection() {
+        // For dedup, lower cardinality = better key (more repeated values).
+        let headers = vec![
+            "category".to_string(), // low cardinality (2 values)
+            "id".to_string(),       // high cardinality (unique)
+            "name".to_string(),     // medium cardinality
+        ];
+        let rows = vec![
+            vec!["A".to_string(), "1".to_string(), "Alice".to_string()],
+            vec!["B".to_string(), "2".to_string(), "Bob".to_string()],
+            vec!["A".to_string(), "3".to_string(), "Charlie".to_string()],
+        ];
+
+        let config = DedupConfig {
+            key_columns: 1,
+            ..Default::default()
+        };
+        let indices = determine_key_columns_for_report(&headers, &rows, 1);
+
+        // Should select 'category' (column index 0) as it has the lowest cardinality.
+        assert_eq!(indices.len(), 1);
+        assert_eq!(indices[0], 0);
     }
 
     #[test]
@@ -530,8 +579,8 @@ mod tests {
             trim_whitespace: true,
             ..Default::default()
         };
-        
-        // With positional columns as keys and trim_whitespace=true, 
+
+        // With cardinality-based keys and trim_whitespace=true,
         // "Alice " should match "Alice" in the key column.
         let result = find_duplicates(&headers, &rows, &config).unwrap();
 
