@@ -50,6 +50,7 @@ impl Default for FdConfig {
 }
 
 /// Detect all functional dependencies in the dataset.
+/// Optimized: pre-computes column value sets and uses early termination.
 pub fn find_functional_dependencies(
     headers: &[String],
     rows: &[Vec<String>],
@@ -64,9 +65,13 @@ pub fn find_functional_dependencies(
         };
     }
 
-    let _num_rows = rows.len();
+    let num_rows = rows.len();
     let mut fds: Vec<FunctionalDependency> = Vec::new();
     let mut pairs_analyzed = 0usize;
+
+    // Pre-compute unique value counts per column for early termination.
+    // A column with cardinality == num_rows is a candidate key (determines everything).
+    let col_cardinalities: Vec<usize> = profiles.iter().map(|p| p.cardinality).collect();
 
     // For each ordered pair (A → B), check if A functionally determines B.
     for a_idx in 0..headers.len() {
@@ -76,6 +81,11 @@ pub fn find_functional_dependencies(
             }
 
             pairs_analyzed += 1;
+
+            // Early termination: if determinant has cardinality 1 (constant), it can't determine anything.
+            if col_cardinalities[a_idx] <= 1 {
+                continue;
+            }
 
             // Build mapping: determinant values → set of dependent values.
             let mut map: HashMap<String, HashSet<String>> = HashMap::new();

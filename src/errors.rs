@@ -1,4 +1,3 @@
-use anyhow::Error;
 use std::path::PathBuf;
 
 /// Custom error type for RSF operations (rsf-cli specific)

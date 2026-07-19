@@ -10,7 +10,7 @@ use std::path::PathBuf;
 pub use rsf::{ColumnMeta, ColumnProfile, RankingOptions, Schema, TypeHint};
 
 // Re-export core functionality from rsf-core (rsf-cli uses ? directly on these)
-pub use rsf::{rank_columns, compute_profiles, reorder_data, sort_rows_canonical, detect_type_hint};
+pub use rsf::{rank_columns, compute_profiles, reorder_data, sort_rows_canonical};
 
 /// Write schema to file - rsf-cli's version using RsfError for CLI integration
 pub fn write_schema(columns: &[ColumnMeta], path: &PathBuf) -> RsfResult<()> {
