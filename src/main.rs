@@ -1,5 +1,6 @@
 mod dedup;
 mod deps;
+mod encoding;
 mod errors;
 mod join;
 mod ready;

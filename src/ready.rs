@@ -65,22 +65,10 @@ fn detect_encoding(path: &Path) -> Result<String> {
     Ok("utf-8".to_string())
 }
 
-/// Convert UTF-16 LE bytes to UTF-8 string
+/// Convert UTF-16 LE bytes to UTF-8 string (delegates to shared encoding module).
 fn utf16le_to_utf8(bytes: &[u8]) -> Result<String> {
-    // Remove BOM if present
-    let bytes = if bytes.len() >= 2 && &bytes[0..2] == [0xFF, 0xFE] {
-        &bytes[2..]
-    } else {
-        bytes
-    };
-
-    // Convert pairs of u16 to chars using String::from_utf16 (most efficient)
-    let utf16_chars: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect();
-
-    String::from_utf16(&utf16_chars).with_context(|| "Failed to decode UTF-16 LE content")
+    let decoded = crate::encoding::decode_utf16_le(bytes);
+    Ok(decoded)
 }
 
 /// Clean a single field: replace embedded newlines with spaces, truncate if needed

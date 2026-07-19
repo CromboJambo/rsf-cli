@@ -9,10 +9,6 @@ pub enum RsfError {
     CsvError { message: String },
     /// Schema validation error
     SchemaError { message: String },
-    /// Invalid column ordering
-    ColumnOrderError { position: usize, expected: String, found: String },
-    /// Invalid cardinality ranking
-    CardinalityError { column: String, expected: usize, found: usize },
     /// Row sorting error
     SortError,
     /// Unknown error type (includes conversions from anyhow::Error)
@@ -32,14 +28,6 @@ impl RsfError {
         RsfError::SchemaError { message: message.into() }
     }
 
-    pub fn column_order_error(position: usize, expected: String, found: String) -> Self {
-        RsfError::ColumnOrderError { position, expected, found }
-    }
-
-    pub fn cardinality_error(column: String, expected: usize, found: usize) -> Self {
-        RsfError::CardinalityError { column, expected, found }
-    }
-
     pub fn sort_error() -> Self {
         RsfError::SortError
     }
@@ -55,8 +43,6 @@ impl std::fmt::Display for RsfError {
             RsfError::IoError { path, cause } => write!(f, "Failed to open file '{}': {}", path.display(), cause),
             RsfError::CsvError { message } => write!(f, "CSV error: {}", message),
             RsfError::SchemaError { message } => write!(f, "Schema error: {}", message),
-            RsfError::ColumnOrderError { position, expected, found } => write!(f, "Column order mismatch at position {}: expected '{}', found '{}'", position, expected, found),
-            RsfError::CardinalityError { column, expected, found } => write!(f, "Column '{}' has invalid cardinality: expected {}, found {}", column, expected, found),
             RsfError::SortError => write!(f, "Rows are not in canonical sorted order"),
             RsfError::Unknown(message) => write!(f, "Unknown error: {}", message),
         }

@@ -188,47 +188,14 @@ pub fn parse_csv(path: &str) -> Result<Table> {
     parse_csv_content(&content)
 }
 
-/// Decode UTF-16 LE bytes to string (with optional BOM stripping)
+/// Decode UTF-16 LE bytes to string (delegates to shared encoding module).
 fn decode_utf16_le(raw: &[u8]) -> String {
-    let data = if raw.starts_with(&[0xFF, 0xFE]) {
-        &raw[2..] // Strip BOM
-    } else {
-        raw
-    };
-
-    // Convert UTF-16 LE to string
-    let mut chars = Vec::new();
-    for chunk in data.chunks(2) {
-        if chunk.len() == 2 {
-            let codepoint = u16::from_le_bytes([chunk[0], chunk[1]]);
-            if let Some(c) = char::from_u32(codepoint as u32) {
-                chars.push(c);
-            }
-        }
-    }
-
-    chars.into_iter().collect()
+    crate::encoding::decode_utf16_le(raw)
 }
 
-/// Decode UTF-16 BE bytes to string (with optional BOM stripping)
+/// Decode UTF-16 BE bytes to string (delegates to shared encoding module).
 fn decode_utf16_be(raw: &[u8]) -> String {
-    let data = if raw.starts_with(&[0xFE, 0xFF]) {
-        &raw[2..] // Strip BOM
-    } else {
-        raw
-    };
-
-    let mut chars = Vec::new();
-    for chunk in data.chunks(2) {
-        if chunk.len() == 2 {
-            let codepoint = u16::from_be_bytes([chunk[0], chunk[1]]);
-            if let Some(c) = char::from_u32(codepoint as u32) {
-                chars.push(c);
-            }
-        }
-    }
-
-    chars.into_iter().collect()
+    crate::encoding::decode_utf16_be(raw)
 }
 
 /// Parse CSV content (tab-delimited, quoted fields)

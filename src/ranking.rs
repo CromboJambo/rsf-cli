@@ -57,7 +57,7 @@ pub fn validate_cardinality_order(headers: &[String], rows: &[Vec<String>], sche
         if idx + 1 >= schema_columns.len() {
             if let Some(n) = schema_columns.get(idx + 1) {
                 if c.cardinality < n.cardinality {
-                    return Err(RsfError::cardinality_error(c.name.clone(), n.cardinality, c.cardinality));
+                    return Err(RsfError::schema_error(format!("Column '{}' cardinality {} < next column cardinality {}", c.name, c.cardinality, n.cardinality)));
                 }
             }
         }
