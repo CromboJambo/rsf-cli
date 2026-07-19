@@ -19,6 +19,8 @@ use crate::ranking::{
     compute_profiles, rank_columns, reorder_data, sort_rows_canonical, validate_cardinality_order,
     validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
 };
+// Re-export table types for pipeline operations (Phase 7)
+pub use rsf::table::{Column, FieldValue, TypedTable};
 /// RSF - Ranked Spreadsheet Format
 ///
 /// Deterministic column ordering based on cardinality.
@@ -130,6 +132,13 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+
+    /// Open a CSV file and output typed YAML for pipeline operations
+    Open {
+        /// Input CSV file (use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -238,7 +247,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Deps { input, treat_empty_as_null } => {
-            let (headers, rows) = read_csv(&input)?;
+            let (headers, rows) = read_input(&input)?;
 
             // Compute column profiles for FD analysis.
             let options = RankingOptions {
@@ -327,20 +336,55 @@ fn main() -> Result<()> {
 
             let config = ReadyConfig::default();
 
-            make_rsf_ready(
-                &PathBuf::from(&input),
-                output.as_deref(),
-                config,
-            )?;
+            make_rsf_ready(&PathBuf::from(&input), output.as_deref(), config)?;
+        }
+
+        Commands::Open { input } => {
+            // Read CSV data (file or stdin)
+            let (headers, rows) = read_csv(&input)?;
+
+            // Compute column profiles for type inference
+            let options = RankingOptions {
+                treat_empty_as_null: true,
+                include_nulls: false,
+            };
+            let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            // Build typed table and output as YAML for pipeline consumption
+            let table = TypedTable::from_untyped(&headers, &rows, &profiles);
+            println!("{}", table.to_yaml());
         }
     }
 
     Ok(())
 }
 
+/// Read input from a file path or stdin (CSV).
 fn read_csv(input: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     if input == "-" {
         read_csv_reader(io::stdin())
+    } else {
+        read_csv_file(&PathBuf::from(input))
+    }
+}
+
+/// Read input from a file path or stdin, trying YAML (pipeline) first then CSV.
+fn read_input(input: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    if input == "-" {
+        // Read stdin once into memory — we may try two parsers on it
+        let stdin_data = io::read_to_string(io::stdin())?;
+
+        // Try YAML first (pipeline mode from `rsf open`)
+        if let Ok(table) = TypedTable::from_yaml(&stdin_data) {
+            let headers: Vec<String> = table.columns.iter().map(|c| c.name.clone()).collect();
+            let rows: Vec<Vec<String>> = table.rows.iter()
+                .map(|row| row.iter().map(|v| v.as_str()).collect())
+                .collect();
+            return Ok((headers, rows));
+        }
+
+        // Fall back to CSV parsing on the same data
+        read_csv_reader(io::Cursor::new(stdin_data))
     } else {
         read_csv_file(&PathBuf::from(input))
     }
