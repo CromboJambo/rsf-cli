@@ -12,7 +12,6 @@ use std::fs::File;
 use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
-use crate::errors::{RsfError};
 use crate::deps::{find_functional_dependencies, print_report as print_fd_report, FdConfig};
 use crate::join::{execute_join, find_join_candidates, print_join_report, print_plan_report, JoinConfig, JoinMode};
 use crate::ranking::{
@@ -395,18 +394,40 @@ fn read_csv_file(path: &PathBuf) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     read_csv_reader(BufReader::new(file))
 }
 
+/// Maximum number of columns allowed (prevents OOM on malformed data).
+const MAX_COLUMNS: usize = 10_000;
+/// Maximum number of rows to load into memory.
+const MAX_ROWS: usize = 5_000_000;
+
 fn read_csv_reader<R: io::Read>(reader: R) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let mut csv_reader = Reader::from_reader(reader);
 
-    let headers = csv_reader
+    let headers: Vec<String> = csv_reader
         .headers()?
         .iter()
         .map(|s| s.to_string())
         .collect();
 
+    // Check column count limit early.
+    if headers.len() > MAX_COLUMNS {
+        anyhow::bail!(
+            "Input has {} columns, exceeds maximum of {}",
+            headers.len(),
+            MAX_COLUMNS
+        );
+    }
+
     let rows: Result<Vec<Vec<String>>> = csv_reader
         .records()
-        .map(|result| {
+        .enumerate()
+        .map(|(i, result)| {
+            if i >= MAX_ROWS {
+                anyhow::bail!(
+                    "Input has {} rows, exceeds maximum of {}. Use filtering to reduce input size.",
+                    i + 1,
+                    MAX_ROWS
+                );
+            }
             result
                 .map(|record| record.iter().map(|s| s.to_string()).collect())
                 .context("Failed to read CSV record")
