@@ -1,4 +1,4 @@
-use crate::errors::RsfResult;
+use anyhow::Result;
 use std::collections::HashMap;
 
 /// Configuration for duplicate detection behavior.
@@ -68,7 +68,7 @@ pub fn find_duplicates(
     headers: &[String],
     rows: &[Vec<String>],
     config: &DedupConfig,
-) -> RsfResult<DedupResult> {
+) -> Result<DedupResult> {
     if rows.is_empty() {
         return Ok(DedupResult {
             total_rows: 0,
