@@ -4,17 +4,18 @@
 
 | Phase | Feature                    | Status     |
 |-------|----------------------------|------------|
-| Phase | Feature                    | Status     | Edge Cases Covered | Resolved Concerns |
-|-------|----------------------------|------------|--------------------|-------------------|
-| 0     | Core ranking & sorting     | ✅ Done    | Cardinality ordering edge cases, canonical sort failures | Foundation stability |
-| 1     | Rich column profiling      | ✅ Done    | Null detection (empty strings), constant columns, type inference gaps | Column understanding for decisions |
-| 2     | Type inference             | ✅ Done    | Currency symbol detection ($/€/£/¥/₹), date format variants, boolean patterns | Structured data from raw text |
-| 3     | Duplicate detection        | ✅ Done    | Multiple copies of same transaction, currency formatting variations, rounding errors, whitespace-only keys, unicode names | Cost accounting discrepancies resolution |
-| 4     | Functional dependencies    | ✅ Done    | Hidden relational structure discovery, candidate key identification, determinant ranking | ERP data relationship mapping |
-| 5     | Multi-file join planning   | ✅ DONE   | Candidate keys across files, confidence scoring (exact name match + compatible types), unmatched row counts | Related dataset merge capability |
-| 6     | Production data integration| ✅ DONE   | UTF-16 LE/BE BOM detection, embedded newlines in quoted fields, field normalization, typed schema export | Excel/Talend export bridge to rsf-cli |
+| 0     | Core ranking & sorting     | ✅ Done    |
+| 1     | Rich column profiling      | ✅ Done    |
+| 2     | Type inference             | ✅ Done    |
+| 3     | Duplicate detection        | ✅ Done    |
+| 4     | Functional dependencies    | ✅ Done    |
+| 5     | Multi-file join planning   | ✅ Done    |
+| 6     | Production data integration| ✅ Done    |
+| 7     | nushell-like CLI pipeline  | ✅ Done    |
 
----\n\n## Summary\n|| Phase | Feature                 | Status   | Effort      | Value for your work                             |\n||-------|-------------------------|----------|-------------|-------------------------------------------------|\n|| 0     | Core ranking & sorting  | Done     | Low         | High — the foundation everything builds on      |\
+---
+
+## Summary
 
 ---
 
@@ -254,17 +255,24 @@ columns:
 
 ---
 
-## Phase 7 — nushell-like CLI Integration (Next)
+## Phase 7 — nushell-like CLI Integration (Done)
 
-**Goal:** Build a cohesive command-line experience that matches nushell's typed data model while maintaining rsf-cli's deterministic, reproducible output.
+**Goal:** Build a cohesive command-line experience that matches nushell's typed data model while maintaining rsf-cli's deterministic, reproducible output. **Status: Complete with three pipeline operators.**
 
-**Planned features:**
-- `rsf open <file>` — Load CSV with auto-typed schema inference (like `open` in nushell)
-- `rsf where column > value` — Filter rows using typed expressions
-- `rsf select column1, column2` — Project columns with type preservation
-- Pipeline composition: `rsf open data.csv | rsf where Status = "Released" | rsf stats`
+**What's built:**
+- `rsf open <file>` — Load CSV with auto-typed schema inference via `TypedTable::from_untyped()`, outputs YAML for pipeline consumption
+- `rsf where <expr>` — Filter rows using typed expressions from rsf-core's `Expr` parser (e.g., `Age > 25`, `Status = "Released"`)
+- `rsf select -c "col1,col2"` — Project columns with type preservation, comma-separated names (case-insensitive)
+- `rsf sort <column>` — Sort rows ascending by a single column with typed comparison
+- Pipeline composition via YAML stdin/stdout: `rsf open data.csv | rsf where 'Age > 25' | rsf select -c "Name,City" | rsf sort City`
 
-**Why this matters:** nushell's strength is its **typed pipeline model** — each command knows the schema of what comes in and what goes out. This makes `rsf-cli` more than a formatting tool; it becomes an interactive data exploration environment.
+**Implementation:**
+- All three operators accept YAML from stdin (output of `rsf open`) or CSV files, with automatic format detection
+- Each command uses `TypedTable::from_yaml()` for pipeline input and `TypedTable.to_yaml()` for output
+- Type preservation across pipeline stages via rsf-core's `FieldValue` enum (`!Text`, `!Integer`, `!Float`, etc.)
+- Output format configurable: `--format csv` produces CSV instead of YAML
+
+**Why this matters:** nushell's strength is its **typed pipeline model** — each command knows the schema of what comes in and what goes out. This makes `rsf-cli` more than a formatting tool; it becomes an interactive data exploration environment where commands compose naturally via pipes.
 
 ---
 
@@ -278,3 +286,5 @@ columns:
 | 3     | Duplicate detection     | Done     | Medium      | Very high — directly solves your work problem   |
 | 4     | Functional dependencies | Done     | Medium-High | High — discovers hidden structure automatically |
 | 5     | Join planning           | Done     | High        | Medium — useful but less immediately pressing   |
+| 6     | Production data integr. | Done     | High        | Very high — replaces entire Python stack        |
+| 7     | nushell-like pipeline   | Done     | Medium      | High — interactive data exploration via pipes   |
