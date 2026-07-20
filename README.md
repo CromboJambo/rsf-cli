@@ -240,6 +240,67 @@ sqlite3 mirror.db "SELECT * FROM events ORDER BY timestamp" | \
 # that's deterministic and provably ordered
 ```
 
+## Pipeline Operations (Phase 7)
+
+rsf-cli supports a nushell-like typed pipeline model. Commands compose via YAML stdin/stdout:
+
+```bash
+# Load CSV with auto-typed schema inference
+rsf open data.csv
+---
+columns:
+- name: TransactionID
+  type: id
+- name: Amount
+  type: currency
+rows:
+- - !Id "TXN001"
+  - !Currency "$45.99"
+```
+
+### Filter rows with typed expressions
+
+```bash
+# Filter by numeric comparison (type-aware)
+rsf open data.csv | rsf where 'Amount > 100'
+
+# Filter by string equality
+rsf open data.csv | rsf where 'Status = "Released"'
+
+# Combine with other operators
+rsf open data.csv | rsf where 'Amount > 50' | rsf sort Amount
+```
+
+### Project columns (type preservation)
+
+```bash
+# Select specific columns — types preserved through pipeline
+rsf open data.csv | rsf select -c "Name,City"
+
+# Output as CSV instead of YAML
+rsf open data.csv | rsf select -c "Name,City" --format csv
+```
+
+### Sort by column
+
+```bash
+# Ascending sort with typed comparison (integers compare numerically, text alphabetically)
+rsf open data.csv | rsf sort Amount
+```
+
+### Full pipeline example
+
+```bash
+rsf open transactions.csv \
+  | rsf where 'Amount > 50' \
+  | rsf select -c "Vendor,Category,Amount" \
+  | rsf sort Amount
+```
+
+Each command accepts YAML from stdin (output of `rsf open`) or CSV files directly. The pipeline preserves column types (`!Text`, `!Integer`, `!Float`, `!Currency`, etc.) across all stages via rsf-core's `FieldValue` enum.
+
+---
+
 ## What This Unlocks
 
 Once columns are ranked correctly:
