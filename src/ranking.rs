@@ -54,11 +54,10 @@ pub fn validate_cardinality_order(headers: &[String], rows: &[Vec<String>], sche
     let profiles = compute_profiles(headers, rows, options)?;
 
     for (idx, c) in schema_columns.iter().enumerate() {
-        if idx + 1 >= schema_columns.len() {
-            if let Some(n) = schema_columns.get(idx + 1) {
-                if c.cardinality < n.cardinality {
-                    return Err(RsfError::schema_error(format!("Column '{}' cardinality {} < next column cardinality {}", c.name, c.cardinality, n.cardinality)));
-                }
+        if idx + 1 < schema_columns.len() {
+            let n = &schema_columns[idx + 1];
+            if c.cardinality < n.cardinality {
+                return Err(RsfError::schema_error(format!("Column '{}' cardinality {} < next column cardinality {}", c.name, c.cardinality, n.cardinality)));
             }
         }
     }

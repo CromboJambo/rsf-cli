@@ -94,10 +94,6 @@ enum Commands {
         /// Number of top key columns to group by (default: 3)
         #[arg(long, default_value_t = 3)]
         keys: usize,
-
-        /// Floating-point tolerance for near-duplicate matching (default: 0.01)
-        #[arg(long, default_value_t = 0.01)]
-        tolerance: f64,
     },
 
     /// Join two RSF files on a common key column
@@ -264,15 +260,13 @@ fn main() -> Result<()> {
             print_fd_report(&deps);
         }
 
-        Commands::Dedup { input, output, keys, tolerance } => {
+        Commands::Dedup { input, output, keys } => {
             let (headers, rows) = read_csv(&input)?;
 
             let config = dedup::DedupConfig {
                 key_columns: keys,
-                float_tolerance: tolerance,
                 trim_whitespace: true,
             };
-
             let result = dedup::find_duplicates(&headers, &rows, &config).map_err(|e| anyhow::anyhow!("{}", e))?;
 
             // Print report to stderr

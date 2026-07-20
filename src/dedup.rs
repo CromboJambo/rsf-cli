@@ -6,10 +6,6 @@ use std::collections::HashMap;
 pub struct DedupConfig {
     /// Number of top key columns to group by (by cardinality).
     pub key_columns: usize,
-    #[allow(dead_code)]
-    /// Tolerance for floating-point / currency comparisons (absolute difference).
-    pub float_tolerance: f64,
-    #[allow(dead_code)]
     /// Whether to trim whitespace before comparing text values.
     pub trim_whitespace: bool,
 }
@@ -18,7 +14,6 @@ impl Default for DedupConfig {
     fn default() -> Self {
         Self {
             key_columns: 3,
-            float_tolerance: 0.01,
             trim_whitespace: true,
         }
     }
@@ -117,7 +112,7 @@ pub fn find_duplicates(
         }
 
         // We have a group of rows with matching key columns.
-        let (exact_count, near_groups) = analyze_group(&members);
+        let (exact_count, near_groups) = analyze_group(&members, &key_indices);
 
         if !near_groups.is_empty() {
             duplicate_groups.extend(near_groups);
@@ -218,7 +213,10 @@ fn group_by_keys(
 }
 
 /// Analyze a group of rows for exact and near-duplicate matches.
-fn analyze_group(members: &[(usize, Vec<String>)]) -> (usize, Vec<DuplicateGroup>) {
+fn analyze_group(
+    members: &[(usize, Vec<String>)],
+    key_indices: &[usize],
+) -> (usize, Vec<DuplicateGroup>) {
     let mut duplicate_groups: Vec<DuplicateGroup> = Vec::new();
     let mut seen_exact_keys: HashMap<String, usize> = HashMap::new();
 
@@ -263,7 +261,7 @@ fn analyze_group(members: &[(usize, Vec<String>)]) -> (usize, Vec<DuplicateGroup
                     if member.values == group.representative {
                         near_group.members.push(member.clone());
                     } else {
-                        let diffs = find_differences(&member.values, &group.representative);
+                        let diffs = find_differences(&member.values, &group.representative, key_indices);
                         near_group.members.push(RowInfo {
                             row_index: member.row_index,
                             values: member.values.clone(),
@@ -284,12 +282,16 @@ fn analyze_group(members: &[(usize, Vec<String>)]) -> (usize, Vec<DuplicateGroup
 }
 
 /// Find differences between two rows that are otherwise key-matched.
-fn find_differences(actual: &[String], expected: &[String]) -> Vec<Difference> {
+fn find_differences(
+    actual: &[String],
+    expected: &[String],
+    key_indices: &[usize],
+) -> Vec<Difference> {
     let mut diffs = Vec::new();
 
     for (i, (a, e)) in actual.iter().zip(expected.iter()).enumerate() {
         // Skip key columns — differences there mean different groups.
-        if i == 0 || i == 1 {
+        if key_indices.contains(&i) {
             continue;
         }
 

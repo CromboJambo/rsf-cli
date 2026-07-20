@@ -85,7 +85,7 @@ fn clean_field(field: &str, max_length: usize) -> String {
 }
 
 /// Pad or truncate a row to match expected column count
-fn normalize_row(row: Vec<String>, expected_len: usize) -> Vec<String> {
+fn normalize_row(row: Vec<String>, expected_len: usize, max_field_length: usize) -> Vec<String> {
     if row.len() < expected_len {
         // Pad with empty strings
         let mut normalized = row;
@@ -96,10 +96,10 @@ fn normalize_row(row: Vec<String>, expected_len: usize) -> Vec<String> {
         row[..expected_len]
             .to_vec()
             .into_iter()
-            .map(|s| clean_field(&s, 4096))
+            .map(|s| clean_field(&s, max_field_length))
             .collect()
     } else {
-        row.into_iter().map(|s| clean_field(&s, 4096)).collect()
+        row.into_iter().map(|s| clean_field(&s, max_field_length)).collect()
     }
 }
 
@@ -235,7 +235,7 @@ pub fn make_rsf_ready(
             .iter()
             .map(|f| clean_field(f, config.max_field_length))
             .collect();
-        let normalized = normalize_row(cleaned_row, column_count);
+        let normalized = normalize_row(cleaned_row, column_count, config.max_field_length);
         cleaned_rows.push(normalized);
     }
 
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn test_normalize_row_padding() {
         let row = vec!["a".to_string(), "b".to_string()];
-        let result = normalize_row(row, 5);
+        let result = normalize_row(row, 5, 4096);
         assert_eq!(result.len(), 5);
         assert_eq!(result[0], "a");
         assert_eq!(result[1], "b");
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn test_normalize_row_truncation() {
         let row = vec!["a".to_string(); 10];
-        let result = normalize_row(row, 5);
+        let result = normalize_row(row, 5, 4096);
         assert_eq!(result.len(), 5);
     }
 }

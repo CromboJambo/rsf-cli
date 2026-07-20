@@ -268,7 +268,7 @@ pub fn execute_join(
     // Build index for file 2: join_key -> row_index.
     let mut idx_map: HashMap<String, Vec<usize>> = HashMap::new();
     for (row_idx, row) in rows2.iter().enumerate() {
-        if row_idx < idx2 || idx2 >= row.len() {
+        if idx2 >= row.len() {
             continue;
         }
         let key = normalize_join_key(&row[idx2], config);
@@ -492,7 +492,7 @@ fn normalize_join_key(value: &str, config: &JoinConfig) -> String {
             normalized.trim_end_matches('0').trim_end_matches('.').to_string()
         }
     } else {
-        trimmed.to_lowercase()
+        trimmed.to_owned()
     }
 }
 
