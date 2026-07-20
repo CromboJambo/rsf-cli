@@ -20,7 +20,7 @@ use crate::ranking::{
     validate_column_order, validate_sorted, write_schema, RankingOptions, Schema, TypeHint,
 };
 // Re-export table types for pipeline operations (Phase 7)
-pub use rsf::table::{Column, FieldValue, TypedTable};
+pub use rsf::table::{Column, Expr, FieldValue, TypedTable};
 /// RSF - Ranked Spreadsheet Format
 ///
 /// Deterministic column ordering based on cardinality.
@@ -134,6 +134,49 @@ enum Commands {
         /// Input CSV file (use - for stdin)
         #[arg(default_value = "-")]
         input: String,
+    },
+
+    /// Filter rows using typed expressions (e.g., `Status = "Released"`, `Amount > 100`)
+    Where {
+        /// Expression to filter by (use quotes for strings)
+        expr: String,
+
+        /// Input file (YAML from pipeline or CSV; use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+
+        /// Output format: yaml (default), csv
+        #[arg(long, default_value = "yaml")]
+        format: String,
+    },
+
+    /// Project specific columns with type preservation
+    Select {
+        /// Comma-separated list of column names to keep (e.g., "Name,City")
+        #[arg(short, long)]
+        columns: String,
+
+        /// Input file (YAML from pipeline or CSV; use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+
+        /// Output format: yaml (default), csv
+        #[arg(long, default_value = "yaml")]
+        format: String,
+    },
+
+    /// Sort rows by a column (ascending)
+    Sort {
+        /// Column name to sort by
+        column: String,
+
+        /// Input file (YAML from pipeline or CSV; use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
+
+        /// Output format: yaml (default), csv
+        #[arg(long, default_value = "yaml")]
+        format: String,
     },
 }
 
@@ -347,6 +390,160 @@ fn main() -> Result<()> {
             // Build typed table and output as YAML for pipeline consumption
             let table = TypedTable::from_untyped(&headers, &rows, &profiles);
             println!("{}", table.to_yaml());
+        }
+
+        Commands::Where { expr, input, format } => {
+            // Try YAML (pipeline) first, fall back to CSV
+            let table = if input == "-" {
+                let stdin_data = io::read_to_string(io::stdin())?;
+                match TypedTable::from_yaml(&stdin_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        // Not YAML — parse as CSV and build typed table
+                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            } else {
+                // File path — try YAML first, then CSV
+                let file_data = std::fs::read_to_string(&input)?;
+                match TypedTable::from_yaml(&file_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            };
+
+            // Parse and evaluate the expression
+            let column_names: Vec<String> = table.columns.iter().map(|c| c.name.clone()).collect();
+            let parsed_expr = Expr::parse(&expr, &column_names).map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
+
+            // Apply filter and output
+            let result = table.where_clause(&parsed_expr);
+            match format.as_str() {
+                "csv" => print!("{}", result.to_csv()),
+                _ => println!("{}", result.to_yaml()),
+            }
+        }
+
+        Commands::Select { columns, input, format } => {
+            // Try YAML (pipeline) first, fall back to CSV
+            let table = if input == "-" {
+                let stdin_data = io::read_to_string(io::stdin())?;
+                match TypedTable::from_yaml(&stdin_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            } else {
+                let file_data = std::fs::read_to_string(&input)?;
+                match TypedTable::from_yaml(&file_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            };
+
+            // Parse comma-separated column names and find indices (case-insensitive match)
+            let requested_cols: Vec<&str> = columns.split(',').map(|s| s.trim()).collect();
+            let col_lower: Vec<String> = requested_cols.iter().map(|s| s.to_lowercase()).collect();
+            let indices: Vec<usize> = table.columns.iter()
+                .enumerate()
+                .filter_map(|(i, c)| {
+                    if col_lower.contains(&c.name.to_lowercase()) {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            // Validate all requested columns were found
+            let matched: Vec<String> = indices.iter().map(|i| table.column_name(*i).unwrap()).map(String::from).collect();
+            for col in &requested_cols {
+                if !matched.iter().any(|m| m.to_lowercase() == col.to_lowercase()) {
+                    anyhow::bail!("Column '{}' not found. Available: {}", col, matched.join(", "));
+                }
+            }
+
+            let result = table.select_columns(&indices);
+            match format.as_str() {
+                "csv" => print!("{}", result.to_csv()),
+                _ => println!("{}", result.to_yaml()),
+            }
+        }
+
+        Commands::Sort { column, input, format } => {
+            // Try YAML (pipeline) first, fall back to CSV
+            let table = if input == "-" {
+                let stdin_data = io::read_to_string(io::stdin())?;
+                match TypedTable::from_yaml(&stdin_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            } else {
+                let file_data = std::fs::read_to_string(&input)?;
+                match TypedTable::from_yaml(&file_data) {
+                    Ok(t) => t,
+                    Err(_) => {
+                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
+                        let options = RankingOptions {
+                            treat_empty_as_null: true,
+                            include_nulls: false,
+                        };
+                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
+                        TypedTable::from_untyped(&headers, &rows, &profiles)
+                    }
+                }
+            };
+
+            // Find column index by name (case-insensitive match)
+            let col_idx = table.columns.iter()
+                .position(|c| c.name.to_lowercase() == column.to_lowercase())
+                .ok_or_else(|| {
+                    let available: Vec<String> = table.columns.iter().map(|c| c.name.clone()).collect();
+                    anyhow::anyhow!("Column '{}' not found. Available: {}", column, available.join(", "))
+                })?;
+
+            let result = table.sort_by_column(col_idx);
+            match format.as_str() {
+                "csv" => print!("{}", result.to_csv()),
+                _ => println!("{}", result.to_yaml()),
+            }
         }
     }
 
