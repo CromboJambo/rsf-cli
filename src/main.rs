@@ -1,7 +1,6 @@
 mod dedup;
 mod deps;
 mod encoding;
-mod errors;
 mod join;
 mod ready;
 mod ranking;
@@ -393,38 +392,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Where { expr, input, format } => {
-            // Try YAML (pipeline) first, fall back to CSV
-            let table = if input == "-" {
-                let stdin_data = io::read_to_string(io::stdin())?;
-                match TypedTable::from_yaml(&stdin_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        // Not YAML — parse as CSV and build typed table
-                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            } else {
-                // File path — try YAML first, then CSV
-                let file_data = std::fs::read_to_string(&input)?;
-                match TypedTable::from_yaml(&file_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            };
+            let table = load_typed_table(&input)?;
 
             // Parse and evaluate the expression
             let column_names: Vec<String> = table.columns.iter().map(|c| c.name.clone()).collect();
@@ -439,36 +407,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Select { columns, input, format } => {
-            // Try YAML (pipeline) first, fall back to CSV
-            let table = if input == "-" {
-                let stdin_data = io::read_to_string(io::stdin())?;
-                match TypedTable::from_yaml(&stdin_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            } else {
-                let file_data = std::fs::read_to_string(&input)?;
-                match TypedTable::from_yaml(&file_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            };
+            let table = load_typed_table(&input)?;
 
             // Parse comma-separated column names and find indices (case-insensitive match)
             let requested_cols: Vec<&str> = columns.split(',').map(|s| s.trim()).collect();
@@ -500,36 +439,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Sort { column, input, format } => {
-            // Try YAML (pipeline) first, fall back to CSV
-            let table = if input == "-" {
-                let stdin_data = io::read_to_string(io::stdin())?;
-                match TypedTable::from_yaml(&stdin_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            } else {
-                let file_data = std::fs::read_to_string(&input)?;
-                match TypedTable::from_yaml(&file_data) {
-                    Ok(t) => t,
-                    Err(_) => {
-                        let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
-                        let options = RankingOptions {
-                            treat_empty_as_null: true,
-                            include_nulls: false,
-                        };
-                        let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}", e))?;
-                        TypedTable::from_untyped(&headers, &rows, &profiles)
-                    }
-                }
-            };
+            let table = load_typed_table(&input)?;
 
             // Find column index by name (case-insensitive match)
             let col_idx = table.columns.iter()
@@ -627,6 +537,39 @@ fn read_csv_reader<R: io::Read>(reader: R) -> Result<(Vec<String>, Vec<Vec<Strin
         .collect();
 
     Ok((headers, rows?))
+}
+
+/// Load YAML (pipeline) or CSV input into a TypedTable, trying YAML first then falling back to CSV parsing.
+fn load_typed_table(input: &str) -> Result<TypedTable> {
+    if input == "-" {
+        let stdin_data = io::read_to_string(io::stdin())?;
+        match TypedTable::from_yaml(&stdin_data) {
+            Ok(t) => Ok(t),
+            Err(_) => {
+                let (headers, rows) = read_csv_reader(io::Cursor::new(stdin_data))?;
+                let options = RankingOptions {
+                    treat_empty_as_null: true,
+                    include_nulls: false,
+                };
+                let profiles = compute_profiles(&headers, &rows, options)?;
+                Ok(TypedTable::from_untyped(&headers, &rows, &profiles))
+            }
+        }
+    } else {
+        let file_data = std::fs::read_to_string(&input)?;
+        match TypedTable::from_yaml(&file_data) {
+            Ok(t) => Ok(t),
+            Err(_) => {
+                let (headers, rows) = read_csv_file(&PathBuf::from(&input))?;
+                let options = RankingOptions {
+                    treat_empty_as_null: true,
+                    include_nulls: false,
+                };
+                let profiles = compute_profiles(&headers, &rows, options)?;
+                Ok(TypedTable::from_untyped(&headers, &rows, &profiles))
+            }
+        }
+    }
 }
 
 fn ranking_options(nulls_distinct: bool) -> RankingOptions {
