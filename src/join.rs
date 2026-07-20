@@ -473,7 +473,7 @@ pub fn execute_join(
 }
 
 /// Normalize a join key value for comparison.
-fn normalize_join_key(value: &str, config: &JoinConfig) -> String {
+fn normalize_join_key(value: &str, _config: &JoinConfig) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return "NULL".to_string();

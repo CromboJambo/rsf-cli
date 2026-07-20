@@ -1,4 +1,4 @@
-use crate::ranking::{ColumnProfile, RankingOptions};
+use crate::ranking::ColumnProfile;
 use std::collections::{HashMap, HashSet};
 
 /// A functional dependency: every value of `determinant` maps to exactly one value of `dependent`.
@@ -65,7 +65,7 @@ pub fn find_functional_dependencies(
         };
     }
 
-    let num_rows = rows.len();
+    let _num_rows = rows.len();
     let mut fds: Vec<FunctionalDependency> = Vec::new();
     let mut pairs_analyzed = 0usize;
 

@@ -52,7 +52,7 @@ pub fn validate_cardinality_order(
     options: RankingOptions,
 ) -> Result<()> {
     // Call rsf-core's compute_profiles (uses its own error type, converted via ?)
-    let profiles = compute_profiles(headers, rows, options)?;
+    let _profiles = compute_profiles(headers, rows, options)?;
 
     for (idx, c) in schema_columns.iter().enumerate() {
         if idx + 1 < schema_columns.len() {
