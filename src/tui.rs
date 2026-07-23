@@ -216,11 +216,14 @@ impl App {
 
             // ── Replace-all ─────────────────────────────────────────
             (KeyCode::Char('R'), KeyModifiers::CONTROL) if matches!(self.search_mode, SearchMode::Replace(..)) => {
-                if let SearchMode::Replace(find_text, replace_text) = &self.search_mode {
-                    self.do_replace_all(find_text, replace_text);
-                    self.status = format!("Replaced all occurrences of '{}'", find_text);
-                    return true;
-                }
+                // Clone to avoid borrow conflict with do_replace_all.
+                let (find_text, replace_text) = match &self.search_mode {
+                    SearchMode::Replace(f, r) => (f.clone(), r.clone()),
+                    _ => unreachable!(),
+                };
+                self.do_replace_all(&find_text, &replace_text);
+                self.status = format!("Replaced all occurrences of '{}'", find_text);
+                return true;
             }
 
             // ── Navigation (only when not in search mode) ───────────
@@ -301,6 +304,9 @@ impl App {
                         _ => {}
                     }
                     return true;
+                }
+                SearchMode::None => {
+                    // Shouldn't reach here since we check is_active() above, but handle it.
                 }
             }
         }
@@ -427,8 +433,7 @@ impl App {
 
     /// Get the data profile for a column by index.
     pub fn get_profile(&self, idx: usize) -> Option<&ColumnProfile> {
-        // Profiles are passed in at construction but not stored yet — we need to store them.
-        None
+        self.profiles.get(idx)
     }
 
     // ── Find/replace helpers ────────────────────────────────────────
@@ -532,12 +537,16 @@ impl App {
             // No sort — restore original order.
             let mut indices: Vec<usize> = (0..self.original_rows.len()).collect();
             indices.sort_by(|a, b| {
-                // Find the position of original_rows[a] in the current rows.
+                // Find the position of original_rows[a] in the current rows by comparing cell-by-cell.
                 let pos_a = self.table.rows.iter().position(|r| {
-                    r.iter().zip(self.original_rows[*a].iter()).all(|(fv, s)| fv.as_str() == s)
+                    r.iter()
+                        .zip(self.original_rows[*a].iter())
+                        .all(|(fv, s)| fv.as_str() == s.as_str())
                 }).unwrap_or(*a);
                 let pos_b = self.table.rows.iter().position(|r| {
-                    r.iter().zip(self.original_rows[*b].iter()).all(|(fv, s)| fv.as_str() == s)
+                    r.iter()
+                        .zip(self.original_rows[*b].iter())
+                        .all(|(fv, s)| fv.as_str() == s.as_str())
                 }).unwrap_or(*b);
                 pos_a.cmp(&pos_b)
             });
@@ -631,29 +640,33 @@ impl App {
 
     /// Get the sort indicator for a column header.
     pub fn get_sort_indicator(&self, col_idx: usize) -> Option<&SortDir> {
-        self.sort_col.as_ref().and_then(|&c| if c == col_idx { Some(&self.sort_dir) } else { None })
+        self.sort_col.as_ref().and_then(|&c| {
+            if c == col_idx {
+                Some(&self.sort_dir)
+            } else {
+                None
+            }
+        })
     }
 
     /// Get the profile for a column (if profiles were stored).
-    pub fn get_profile_for_col(&self, _idx: usize) -> Option<&ColumnProfile> {
-        // Profiles are not currently stored in App — this is a placeholder.
-        // The caller should pass profiles separately or we store them.
-        None
+    pub fn get_profile_for_col(&self, idx: usize) -> Option<&ColumnProfile> {
+        self.profiles.get(idx)
     }
 }
 
 // ── TUI entry point ───────────────────────────────────────────────
 
-pub fn run_tui(mut table: TypedTable, _profiles: Vec<ColumnProfile>) -> anyhow::Result<()> {
+pub fn run_tui(mut table: TypedTable, profiles: Vec<ColumnProfile>) -> anyhow::Result<()> {
     let stdout = io::stdout();
     execute!(stdout.lock(), EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(table, _profiles);
+    let mut app = App::new(table, profiles);
 
     loop {
-        terminal.draw(|frame: &mut ratatui::Frame<CrosstermBackend<std::io::Stdout>>| draw(frame, &mut app))?;
+        terminal.draw(|frame| draw(frame, &mut app))?;
 
         if !app.handle_key() {
             break;
@@ -666,9 +679,9 @@ pub fn run_tui(mut table: TypedTable, _profiles: Vec<ColumnProfile>) -> anyhow::
     Ok(())
 }
 
-// ── Render function ───────────────────────────────────────────────
+// ── Render function (non-generic: concrete CrosstermBackend) ──────
 
-fn draw<B: ratatui::backend::Backend>(frame: &mut ratatui::Frame<'_>, app: &mut App) {
+fn draw(frame: &mut ratatui::Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
@@ -790,7 +803,7 @@ fn draw<B: ratatui::backend::Backend>(frame: &mut ratatui::Frame<'_>, app: &mut 
                         .rows
                         .get(abs_row)
                         .and_then(|r| r.get(col_idx))
-                        .map(|v| v.as_str())
+                        .map(|v| v.as_str().to_string())
                         .unwrap_or_default();
                     format!("  {}", val)
                 };
