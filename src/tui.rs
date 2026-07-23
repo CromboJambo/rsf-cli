@@ -156,7 +156,7 @@ impl App {
             (KeyCode::Char('s'), _) if !self.search_mode.is_active() => {
                 let col = self.cursor_col;
                 match &mut self.sort_col {
-                    Some(&sc) if sc == col => {
+                    Some(sc) if *sc == col => {
                         self.sort_dir.toggle();
                         self.rebuild_sort();
                         self.status = format!(
@@ -533,10 +533,13 @@ impl App {
             let mut indices: Vec<usize> = (0..self.original_rows.len()).collect();
             indices.sort_by(|a, b| {
                 // Find the position of original_rows[a] in the current rows.
-                self.table.rows.iter().position(|r| r == &self.original_rows[*a]).unwrap_or(*a)
-                    .cmp(
-                        &self.table.rows.iter().position(|r| r == &self.original_rows[*b]).unwrap_or(*b),
-                    )
+                let pos_a = self.table.rows.iter().position(|r| {
+                    r.iter().zip(self.original_rows[*a].iter()).all(|(fv, s)| fv.as_str() == s)
+                }).unwrap_or(*a);
+                let pos_b = self.table.rows.iter().position(|r| {
+                    r.iter().zip(self.original_rows[*b].iter()).all(|(fv, s)| fv.as_str() == s)
+                }).unwrap_or(*b);
+                pos_a.cmp(&pos_b)
             });
 
             let mut new_rows = Vec::with_capacity(indices.len());
@@ -650,7 +653,7 @@ pub fn run_tui(mut table: TypedTable, _profiles: Vec<ColumnProfile>) -> anyhow::
     let mut app = App::new(table, _profiles);
 
     loop {
-        terminal.draw(|frame| draw(frame, &mut app))?;
+        terminal.draw(|frame: &mut ratatui::Frame<CrosstermBackend<std::io::Stdout>>| draw(frame, &mut app))?;
 
         if !app.handle_key() {
             break;
@@ -783,15 +786,13 @@ fn draw<B: ratatui::backend::Backend>(frame: &mut ratatui::Frame<'_>, app: &mut 
                 let cell_text = if abs_row == app.cursor_row && col_idx == app.cursor_col {
                     format!(" {}", app.get_cell_text())
                 } else {
-                    format!(
-                        "  {}",
-                        app.table
-                            .rows
-                            .get(abs_row)
-                            .and_then(|r| r.get(col_idx))
-                            .map(|v| v.as_str())
-                            .unwrap_or("")
-                    )
+                    let val = app.table
+                        .rows
+                        .get(abs_row)
+                        .and_then(|r| r.get(col_idx))
+                        .map(|v| v.as_str())
+                        .unwrap_or_default();
+                    format!("  {}", val)
                 };
 
                 let is_cursor = abs_row == app.cursor_row && col_idx == app.cursor_col;
