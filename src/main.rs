@@ -469,16 +469,16 @@ fn main() -> Result<()> {
             // Read CSV data (file or stdin)
             let (headers, rows) = read_csv(&input)?;
 
-            // Compute column profiles for type inference
+            // Compute column profiles for type inference + metadata
             let options = RankingOptions {
                 treat_empty_as_null: true,
                 include_nulls: false,
             };
             let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}: {}", e, input))?;
 
-            // Build typed table and launch TUI
+            // Build typed table and launch TUI with profile metadata
             let table = TypedTable::from_untyped(&headers, &rows, &profiles);
-            tui::run_tui(table)?;
+            tui::run_tui(table, profiles)?;
         }
     }
 
