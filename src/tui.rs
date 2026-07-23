@@ -237,13 +237,13 @@ impl App {
                     match key.code {
                         KeyCode::Enter => {
                             let search = text.clone();
+                            drop(text); // End mutable borrow on self.search_mode
                             self.find_matches(&search);
                             self.status = format!(
                                 "Found {} matches (highlight: 1/{}). Esc to cancel.",
                                 self.match_rows.len(),
                                 if self.match_rows.is_empty() { 0 } else { self.match_rows.len() }
                             );
-                            *text = String::new(); // Reset for next search.
                         }
                         KeyCode::Backspace => {
                             text.pop();
