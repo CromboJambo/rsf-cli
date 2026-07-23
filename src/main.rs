@@ -4,6 +4,8 @@ mod encoding;
 mod join;
 mod ready;
 mod ranking;
+pub mod render;
+mod tui;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -176,6 +178,13 @@ enum Commands {
         /// Output format: yaml (default), csv
         #[arg(long, default_value = "yaml")]
         format: String,
+    },
+
+    /// Open a CSV file in an interactive table viewer TUI
+    View {
+        /// Input CSV file (use - for stdin)
+        #[arg(default_value = "-")]
+        input: String,
     },
 }
 
@@ -454,6 +463,22 @@ fn main() -> Result<()> {
                 "csv" => print!("{}", result.to_csv()),
                 _ => println!("{}", result.to_yaml()),
             }
+        }
+
+        Commands::View { input } => {
+            // Read CSV data (file or stdin)
+            let (headers, rows) = read_csv(&input)?;
+
+            // Compute column profiles for type inference
+            let options = RankingOptions {
+                treat_empty_as_null: true,
+                include_nulls: false,
+            };
+            let profiles = compute_profiles(&headers, &rows, options).map_err(|e| anyhow::anyhow!("{}: {}", e, input))?;
+
+            // Build typed table and launch TUI
+            let table = TypedTable::from_untyped(&headers, &rows, &profiles);
+            tui::run_tui(table)?;
         }
     }
 
