@@ -232,19 +232,63 @@ impl App {
 
         // Handle typed characters for find/replace input.
         if self.search_mode.is_active() {
+            // ── Enter key: handle before mutable borrow to avoid E0499 ──
+            if key.code == KeyCode::Enter {
+                match &self.search_mode {
+                    SearchMode::Find(_) => {
+                        let search = match &self.search_mode {
+                            SearchMode::Find(s) => s.clone(),
+                            _ => unreachable!(),
+                        };
+                        self.find_matches(&search);
+                        self.status = format!(
+                            "Found {} matches (highlight: 1/{}). Esc to cancel.",
+                            self.match_rows.len(),
+                            if self.match_rows.is_empty() { 0 } else { self.match_rows.len() }
+                        );
+                    }
+                    SearchMode::Replace(find_text, _) => {
+                        let search = find_text.clone();
+                        self.find_matches(&search);
+                        self.status = format!(
+                            "Found {} matches. Ctrl+R to replace all. Esc to cancel.",
+                            self.match_rows.len()
+                        );
+                    }
+                    _ => {}
+                }
+                return true;
+            }
+
+            // ── Tab key in Replace mode: handle before mutable borrow ──
+            if key.code == KeyCode::Tab {
+                let need_search = matches!(&self.search_mode, SearchMode::Replace(_, rt) if !rt.is_empty());
+                if need_search {
+                    let search = match &self.search_mode {
+                        SearchMode::Replace(f, _) => f.clone(),
+                        _ => unreachable!(),
+                    };
+                    self.find_matches(&search);
+                    self.status = format!(
+                        "Found {} matches. Ctrl+R to replace all.",
+                        self.match_rows.len()
+                    );
+                }
+                if let SearchMode::Replace(find_text, replace_text) = &mut self.search_mode {
+                    // Tab switches from find field to replace field.
+                    if !find_text.is_empty() && replace_text.is_empty() {
+                        self.status = "Replace: ".to_string();
+                    } else if !replace_text.is_empty() {
+                        *find_text = String::new();
+                    }
+                }
+                return true;
+            }
+
+            // ── Backspace / Char: mutable borrow for in-place edit ──
             match &mut self.search_mode {
                 SearchMode::Find(text) => {
                     match key.code {
-                        KeyCode::Enter => {
-                            let search = text.clone();
-                            drop(text); // End mutable borrow on self.search_mode
-                            self.find_matches(&search);
-                            self.status = format!(
-                                "Found {} matches (highlight: 1/{}). Esc to cancel.",
-                                self.match_rows.len(),
-                                if self.match_rows.is_empty() { 0 } else { self.match_rows.len() }
-                            );
-                        }
                         KeyCode::Backspace => {
                             text.pop();
                             self.status = format!("Find: {}", text);
@@ -259,29 +303,6 @@ impl App {
                 }
                 SearchMode::Replace(find_text, replace_text) => {
                     match key.code {
-                        KeyCode::Enter => {
-                            let search = find_text.clone();
-                            self.find_matches(&search);
-                            self.status = format!(
-                                "Found {} matches. Ctrl+R to replace all. Esc to cancel.",
-                                self.match_rows.len()
-                            );
-                            *find_text = String::new(); // Reset for next search.
-                        }
-                        KeyCode::Tab => {
-                            // Tab switches from find field to replace field.
-                            if !find_text.is_empty() && replace_text.is_empty() {
-                                self.status = "Replace: ".to_string();
-                            } else if !replace_text.is_empty() {
-                                let search = find_text.clone();
-                                self.find_matches(&search);
-                                self.status = format!(
-                                    "Found {} matches. Ctrl+R to replace all.",
-                                    self.match_rows.len()
-                                );
-                                *find_text = String::new();
-                            }
-                        }
                         KeyCode::Backspace => {
                             if !replace_text.is_empty() {
                                 replace_text.pop();

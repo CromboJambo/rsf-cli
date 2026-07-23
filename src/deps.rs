@@ -241,6 +241,7 @@ pub fn print_report(result: &FdResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ranking::RankingOptions;
 
     fn make_profiles(headers: &[String], rows: &[Vec<String>]) -> Vec<ColumnProfile> {
         let options = RankingOptions::default();
