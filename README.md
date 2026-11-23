@@ -440,3 +440,6 @@ Built as part of the mirror-log ecosystem - stable scaffolding for personal know
 Inspired by the XKCD "Dependency" meme: all modern infrastructure balanced on tiny stable pieces maintained by random people.
 
 We're building more of those tiny stable pieces.
+---
+
+**Contact**: [projects@crombo.dev](mailto:projects@crombo.dev) · **Security**: [Private vulnerability reporting](https://github.com/CromboJambo/rsf-cli/security/advisories/new)
